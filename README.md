@@ -11,7 +11,7 @@ The goal of this project is to compare and gain insights into the behavior of di
 
 - \>\> Compare the methods across key criteria such as accuracy, convergence, speed, and resource consumption.
 
-- \>\> Develop a workflow to propagate topographic uncertainty using a surface flow simulator with the Monte-Carlo method
+- \>\> Document findings and derive insights into the strengths and limitations of each method in the context of Bayesian parameter calibration.
 
 ## Getting started
 
