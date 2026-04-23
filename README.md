@@ -17,8 +17,11 @@ The goal of this project is to compare and gain insights into the behavior of di
 
 ## References
 [1] Chi-Feng, H.: MCMC Playground – Interactive Visualization of Markov Chain Monte Carlo Algorithms, https://chi-feng.github.io/mcmc-demo/app.html?algorithm=HamiltonianMC&target=banana (last access: 23 April 2026).
+
 [2] van Ravenzwaaij, D., Cassey, P., and Brown, S. D.: A simple introduction to Markov Chain Monte Carlo sampling, Psychon. Bull. Rev., 25, 143–154, https://doi.org/10.3758/s13423-016-1015-8, 2018.
+
 [3] The DarkMachines High Dimensional Sampling Group, Albert, J., Balázs, C., Fowlie, A., Handley, W., Hunt-Smith, N., Ruiz de Austri, R., and White, M.: A comparison of Bayesian sampling algorithms for high-dimensional particle physics and cosmology applications, Comput. Phys. Commun., https://doi.org/10.1016/j.cpc.2025.109756, 2025.
+
 [4] Lim, Y.: A review of the Bayesian approach with the MCMC and the HMC as a competitor of classical likelihood statistics for pharmacometricians, Transl. Clin. Pharmacol., 31, 69–79, https://doi.org/10.12793/tcp.2023.31.e9, 2023.
 
 
