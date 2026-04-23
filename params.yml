@@ -1,0 +1,42 @@
+
+
+model: 
+  name: "IA_voellmy"
+  file: "surrogate_voellmy.pkl"
+  input_dim: [2]
+  output_dim: [1]
+  debug: false
+  max_workers: 4
+
+
+calibration:
+  nwalkers:     100
+  nburn:        1000
+  nsteps:       2000
+  pool_type:    process   # serial | thread | process
+  n_workers:    4
+  parameters: ["mu", "xi"] 
+  noise_parameters: ["sigma"]
+  calibrate_noise: false
+  noise_sigma: 0.05
+  data: ["ImpactArea"]
+  likelihood: normal
+  priors:
+    - name: mu
+      distribution:
+        type: uniform     
+        attribute:
+          lower_bound: 2.e-02
+          upper_bound: 5.e-01
+    - name: xi
+      distribution:
+        type: uniform     
+        attribute:
+          lower_bound: 4.e+02 
+          upper_bound: 4.e+03
+    - name: sigma
+      distribution:
+        type: uniform     
+        attribute:
+          lower_bound: 1.0e-9
+          upper_bound: 0.5

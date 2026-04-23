@@ -1,0 +1,10 @@
+name: surrogate_model
+channels:
+  - conda-forge
+dependencies:
+  - pyyaml
+  - numpy
+  - psimpy
+  - pip
+  - pip:
+    - umbridge

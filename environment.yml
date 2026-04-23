@@ -1,0 +1,8 @@
+name: mcmc-bench
+channels:
+  - bioconda
+  - conda-forge
+dependencies:
+  - curl
+  - nextflow=25.10.4
+

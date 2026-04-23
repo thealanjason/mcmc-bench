@@ -1,0 +1,6 @@
+model:
+  name: "vollemy_surrogate"
+  file: "surrogate_voellmy.pkl"
+  input_dim: [2]
+  output_dim: [1]
+  debug: false
