@@ -15,6 +15,21 @@ The goal of this project is to compare and gain insights into the behavior of di
 
 ## Getting started
 
+We use `nextflow` to run this usecase which is specified through the main.nf file. 
+
+1. Create and activate the conda environment
+```
+conda env create -f environment.yml
+conda activate mcmc-bench
+```
+
+2. Run the workflow
+
+```
+nextflow run main.nf -params-file params.yml
+```
+
+
 ## References
 [1] Chi-Feng, H.: MCMC Playground – Interactive Visualization of Markov Chain Monte Carlo Algorithms, https://chi-feng.github.io/mcmc-demo/app.html?algorithm=HamiltonianMC&target=banana (last access: 23 April 2026).
 
