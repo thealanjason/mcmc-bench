@@ -1,52 +1,75 @@
 #!/usr/bin/env nextflow
-import groovy.yaml.YamlBuilder
+
+def toYaml(data) {
+    def yb = new groovy.yaml.YamlBuilder()
+    yb.call(data)
+    return yb.toString()
+}
+
+def _workflowMeta(f) {
+    def cfg = new groovy.yaml.YamlSlurper().parseText(f.text) as Map
+    def bundle_name = "${cfg.model.name}_${workflow.sessionId}".toString()
+    return [cfg, bundle_name, toYaml(cfg)]
+}
 
 
 workflow bpc_massflowIA {
-    def model = params.model.name
+
+    take:
+    config_file
+
+    main:
     def umbridge_port = Math.abs( new Random().nextInt() % (31767 - 16384) ) + 16384 // Safe range [16384, 31767], excludes kernel ephemeral [32768, 60999]
 
+    // Single source of truth: all per-experiment metadata derived once from the config
+    workflow_meta = config_file.map { f -> _workflowMeta(f) }
+    // workflow_meta: [cfg, bundle_name, params_yaml]
+
+    model       = workflow_meta.map { row -> row[0].model.name }
+    bundle_name = workflow_meta.map { row -> row[1] }
+    params_yaml = workflow_meta.map { row -> row[2] }
 
     COLLECT_INPUTS()
 
-    SETUP_UM_IPC () 
-    
+    SETUP_UM_IPC()
+
     SERVE_MODEL(
-        script = file("$moduleDir/model/surrogate_model_server.py"),
-        config = params,
-        name = model,
-        surrogate_model = COLLECT_INPUTS.out.surrogate_model,
-        umbridge_port = umbridge_port,
-        um_highway = SETUP_UM_IPC.out
+        file("$moduleDir/model/surrogate_model_server.py"),
+        params_yaml,
+        model,
+        COLLECT_INPUTS.out.surrogate_model,
+        umbridge_port,
+        SETUP_UM_IPC.out
     )
-    
 
     MCMC_CALIBRATION_EMCEE(
-        script = file("$moduleDir/mcmc/emcee/run_calibration.py"),
-        config = params,
-        data = COLLECT_INPUTS.out.ground_truth,
-        um_highway = SETUP_UM_IPC.out
+        file("$moduleDir/mcmc/emcee/run_calibration.py"),
+        params_yaml,
+        COLLECT_INPUTS.out.ground_truth,
+        SETUP_UM_IPC.out
     )
 
     RUN_DIAGNOSTICS(
-      script = file("$moduleDir/diagnostics/run_diagnostics.py"),
-      mcmc_idata = MCMC_CALIBRATION_EMCEE.out.mcmc_idata,
-      outdir = "diagnostics",
+        file("$moduleDir/diagnostics/run_diagnostics.py"),
+        MCMC_CALIBRATION_EMCEE.out.mcmc_idata,
+        "diagnostics"
     )
 
-
     BUNDLE_OUTPUTS(
-        experiment_params = params,
-        mcmc_output = MCMC_CALIBRATION_EMCEE.out.mcmc_output,
-        mcmc_corner_plot = MCMC_CALIBRATION_EMCEE.out.mcmc_corner_plot,
-        mcmc_trace = MCMC_CALIBRATION_EMCEE.out.mcmc_trace,
-        mcmc_idata = MCMC_CALIBRATION_EMCEE.out.mcmc_idata,
-        mcmc_diagnostics = RUN_DIAGNOSTICS.out
+        "$moduleDir/outputs",
+        bundle_name,
+        params_yaml,
+        MCMC_CALIBRATION_EMCEE.out.mcmc_output,
+        MCMC_CALIBRATION_EMCEE.out.mcmc_corner_plot,
+        MCMC_CALIBRATION_EMCEE.out.mcmc_trace,
+        MCMC_CALIBRATION_EMCEE.out.mcmc_idata,
+        RUN_DIAGNOSTICS.out
     )
 
     GENERATE_REPORT(
-        script = file("$moduleDir/report/generate_report.py"),
-        bundle_dir = BUNDLE_OUTPUTS.out.bundle_dir
+        file("$moduleDir/report/generate_report.py"),
+        "$moduleDir/outputs",
+        BUNDLE_OUTPUTS.out.bundle_dir
     )
 
     emit:
@@ -54,17 +77,20 @@ workflow bpc_massflowIA {
 }
 
 process COLLECT_INPUTS {
+    output:
+    path "ground_truth.csv", emit: ground_truth
+    path "surrogate_voellmy.pkl", emit: surrogate_model
+
     script:
     """
     cp $moduleDir/model/surrogate_voellmy.pkl .
     cp $moduleDir/mcmc/ground_truth.csv .
     """
-    output:
-    path "ground_truth.csv", emit: ground_truth
-    path "surrogate_voellmy.pkl", emit: surrogate_model
 }
 
 process SETUP_UM_IPC {
+    output:
+    path "comm"
 
     script:
     """
@@ -73,9 +99,6 @@ process SETUP_UM_IPC {
     mkdir comm/uq_info
     mkdir comm/umbridge_port
     """
-
-    output:
-    path "comm"
 }
 
 process SERVE_MODEL {
@@ -93,13 +116,11 @@ process SERVE_MODEL {
     path um_highway
 
     script:
-    def parameters = new groovy.yaml.YamlBuilder()
-    parameters(config)
     """
     #!/bin/bash
     UMBRIDGE_PORT=${umbridge_port+100*(task.attempt-1)}
 
-    echo "${parameters.toString()}" > _server_config.yml
+    echo "${config}" > _server_config.yml
 
     # Abort if port already used (success means something is listening)
     if bash -c "echo > /dev/tcp/localhost/\$UMBRIDGE_PORT" 2>/dev/null; then
@@ -113,18 +134,18 @@ process SERVE_MODEL {
     trap 'kill \$SERVER_PID 2>/dev/null || true' EXIT INT TERM
     echo "Model Server PID: \$SERVER_PID (trying port \$UMBRIDGE_PORT)"
 
-    # Wait for model server to start 
+    # Wait for model server to start
     while ! bash -c "echo > /dev/tcp/localhost/\$UMBRIDGE_PORT" 2>/dev/null; do
         sleep 1
     done
 
-    touch $um_highway/model_info/READY 
+    touch $um_highway/model_info/READY
     echo "Model ${name} ready" > $um_highway/model_info/READY
 
     touch $um_highway/umbridge_port/\$UMBRIDGE_PORT
     echo "Model server is running on port \$UMBRIDGE_PORT"
 
-    # Monitor the status 
+    # Monitor the status
     echo "Waiting for UQ to complete..."
     until [ -e $um_highway/uq_info/DONE ]; do
         sleep 1
@@ -140,40 +161,36 @@ process SERVE_MODEL {
 process MCMC_CALIBRATION_EMCEE {
     conda "$moduleDir/mcmc/emcee/environment.yml"
     cache 'lenient'
-    
+
     input:
     path script
     val config
     path data
     path um_highway
 
+    output:
+    path "mcmc_output.npz", emit: mcmc_output
+    path "corner_plot.png", emit: mcmc_corner_plot
+    path "trace.npy",       emit: mcmc_trace
+    path "mcmc_idata.nc",   emit: mcmc_idata
 
     script:
-    def parameters = new YamlBuilder()
-    parameters(config)
     """
-    echo "${parameters.toString()}" > _params.yml
+    echo "${config}" > _params.yml
 
     echo "Waiting for model server to start..."
     until [ -e $um_highway/model_info/READY ]; do
         sleep 1
     done
     cat $um_highway/model_info/READY
-    
+
     MODEL_PORT=\$(ls $um_highway/umbridge_port/ | head -n 1)
     echo "Model server is running on port \${MODEL_PORT}"
-    
+
     python ${script}  --config _params.yml --data ${data} --port \${MODEL_PORT}
-    
+
     touch $um_highway/uq_info/DONE # signal to stop the model server
     """
-
-    output:
-    path "mcmc_output.npz", emit: mcmc_output
-    path "corner_plot.png", emit: mcmc_corner_plot
-    path "trace.npy", emit: mcmc_trace
-    path "mcmc_idata.nc", emit: mcmc_idata
-
 }
 
 process RUN_DIAGNOSTICS {
@@ -184,56 +201,56 @@ process RUN_DIAGNOSTICS {
     path mcmc_idata
     val outdir
 
-    script:
-    """
-    #!/bin/bash
-    python3 ${script} --idata-path ${mcmc_idata} --output-dir "${outdir}" 
-    """
-
     output:
     path "${outdir}"
 
-
+    script:
+    """
+    #!/bin/bash
+    python3 ${script} --idata-path ${mcmc_idata} --output-dir "${outdir}"
+    """
 }
 
 process BUNDLE_OUTPUTS {
-    publishDir "$moduleDir/outputs", mode: 'copy'
 
     input:
-    val experiment_params
+    val output_base_dir
+    val bundle_name
+    val params_yaml
     path mcmc_output
     path mcmc_corner_plot
     path mcmc_trace
     path mcmc_idata
     path mcmc_diagnostics
 
+    output:
+    path "${bundle_name}", emit: bundle_dir
+
     script:
-    def parameters = new YamlBuilder()
-    parameters(experiment_params)
     """
     #!/bin/bash
-    echo "${parameters.toString()}" > _params.yml
+    echo "${params_yaml}" > _params.yml
 
-    mkdir "${params.model.name}_${workflow.sessionId}"
+    mkdir "${bundle_name}"
 
-    cp _params.yml "${params.model.name}_${workflow.sessionId}"
-    cp ${mcmc_output} "${params.model.name}_${workflow.sessionId}/"
-    cp ${mcmc_corner_plot} "${params.model.name}_${workflow.sessionId}/"
-    cp ${mcmc_trace} "${params.model.name}_${workflow.sessionId}/"
-    cp ${mcmc_idata} "${params.model.name}_${workflow.sessionId}/"
-    cp -r ${mcmc_diagnostics} "${params.model.name}_${workflow.sessionId}/"
+    cp _params.yml "${bundle_name}"
+    cp ${mcmc_output} "${bundle_name}/"
+    cp ${mcmc_corner_plot} "${bundle_name}/"
+    cp ${mcmc_trace} "${bundle_name}/"
+    cp ${mcmc_idata} "${bundle_name}/"
+    cp -r ${mcmc_diagnostics} "${bundle_name}/"
+
+    mkdir -p "${output_base_dir}"
+    cp -r "${bundle_name}" "${output_base_dir}/"
     """
-
-    output:
-    path "${params.model.name}_${workflow.sessionId}", emit: bundle_dir
 }
 
 process GENERATE_REPORT {
     conda "$moduleDir/report/environment.yml"
-    publishDir "$moduleDir/outputs/${bundle_dir.name}", mode: 'copy'
 
     input:
     path script
+    val output_base_dir
     path bundle_dir
 
     output:
@@ -245,9 +262,12 @@ process GENERATE_REPORT {
     python3 ${script} \\
         --bundle-dir ${bundle_dir} \\
         --output report.pdf
+    cp report.pdf "${output_base_dir}/${bundle_dir.name}/"
     """
 }
 
 workflow {
-    bpc_massflowIA()
+    bpc_massflowIA(
+        Channel.value(file(params.config_file))
+    )
 }
