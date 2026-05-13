@@ -122,7 +122,9 @@ class LogLikelihood:
             model_parameters = parameters
         try:
             prediction_mean = np.asarray(self.model([[*model_parameters]]))
+            print(prediction_mean)
         except Exception:
+            print(f"MODEL_ERROR at parameters {[*model_parameters]}")
             return -np.inf
         if prediction_mean.shape != self.data.shape:
             raise ValueError("shape of model predictions does not match observations")
@@ -148,7 +150,11 @@ class LogPosterior:
         self.log_likelihood = log_likelihood
 
     def eval(self, parameters) -> float:
-        return self.log_prior.eval(parameters) + self.log_likelihood.eval(parameters)
+        log_prior = self.log_prior.eval(parameters)
+        if not np.isfinite(log_prior):
+            print("Prior_INF")
+            return log_prior
+        return log_prior + self.log_likelihood.eval(parameters)
 
 
 def initialize_walkers(nwalkers: int, prior: Prior) -> np.ndarray:

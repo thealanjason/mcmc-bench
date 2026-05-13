@@ -6,7 +6,7 @@ model:
   input_dim: [2]
   output_dim: [1]
   debug: false
-  max_workers: 4
+  max_workers: 1 # We need it to be 1 because rpy2 is not thread safe
 
 
 calibration:
