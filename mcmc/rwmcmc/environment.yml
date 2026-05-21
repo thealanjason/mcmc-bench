@@ -1,0 +1,18 @@
+name: mcmc-rwmcmc
+channels:
+  - conda-forge
+dependencies:
+  - python=3.12
+  - pyyaml
+  - numpy
+  - scipy
+  - pandas
+  - corner
+  - tqdm
+  - arviz=0.20
+  - h5py
+  - h5netcdf
+  - pip
+  - pip:
+    - umbridge
+    - git+https://github.com/korkmazgoz-caglar/random-walk-mcmc.git@main
