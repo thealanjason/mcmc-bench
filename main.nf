@@ -8,7 +8,8 @@ def toYaml(data) {
 
 def _workflowMeta(f) {
     def cfg = new groovy.yaml.YamlSlurper().parseText(f.text) as Map
-    def bundle_name = "${cfg.model.name}_${workflow.sessionId}".toString()
+    def sampler = cfg.calibration?.sampler ?: 'emcee'
+    def bundle_name = "${cfg.model.name}_${sampler}_${workflow.sessionId}".toString()
     return [cfg, bundle_name, toYaml(cfg)]
 }
 
