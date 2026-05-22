@@ -10,6 +10,8 @@ model:
 
 
 calibration:
+  sampler: rwmcmc # emcee or rwmcmc
+  step_size: [0.05, 400] # step size for each parameter, mu and xi, respectively. I took 10% of the range. This should be modified/tuned according to the acceptance ratio from the real test.
   nwalkers:     100
   nburn:        1000
   nsteps:       2000
