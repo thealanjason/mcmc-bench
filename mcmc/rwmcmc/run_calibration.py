@@ -123,9 +123,7 @@ class LogLikelihood:
             model_parameters = parameters
         try:
             prediction_mean = np.asarray(self.model([[*model_parameters]]))
-            print(prediction_mean)
         except Exception:
-            print(f"MODEL_ERROR at parameters {[*model_parameters]}")
             return -np.inf
         if prediction_mean.shape != self.data.shape:
             raise ValueError("shape of model predictions does not match observations")
@@ -153,7 +151,6 @@ class LogPosterior:
     def eval(self, parameters) -> float:
         log_prior = self.log_prior.eval(parameters)
         if not np.isfinite(log_prior):
-            print("Prior_INF")
             return log_prior
         return log_prior + self.log_likelihood.eval(parameters)
 
@@ -313,10 +310,11 @@ if __name__ == "__main__":
     """
 
     # Perform MCMC Calibration
-    nchains = config["calibration"]["nwalkers"] # this is basically nchains, not nwalkers but I want to keep the same naming within the config in params.yml.
+    sampler_params = config["calibration"]["sampler_params"]["rwmcmc"]
+    nchains = sampler_params["nwalkers"]
+    step_size_cfg = sampler_params.get("step_size", 0.1)
     nsteps = config["calibration"]["nsteps"]
     nburn = config["calibration"]["nburn"]
-    step_size_cfg = config["calibration"].get("step_size", 0.1)
 
     print(f"Running {nchains} chains x {nsteps} steps ({nburn} burn-in)")
     print(f"step_size: {step_size_cfg}")
