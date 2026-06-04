@@ -26,9 +26,20 @@ conda activate mcmc-bench
 2. Run the workflow
 
 ```
-nextflow run main.nf -params-file params.yml
+nextflow run main.nf -params-file params.yml --config_file params.yml
 ```
 
+### Selecting a sampler
+
+The MCMC sampler is chosen via the `calibration.sampler` field in
+`params.yml`. Two samplers are currently available:
+```yaml
+calibration:
+  sampler: rwmcmc   # options: emcee | rwmcmc
+```
+Each sampler reads its own parameters from `calibration.sampler_params`,
+so you can configure them independently (e.g. `nwalkers` for emcee,
+`step_size` for rwmcmc).
 
 ## References
 [1] Chi-Feng, H.: MCMC Playground – Interactive Visualization of Markov Chain Monte Carlo Algorithms, https://chi-feng.github.io/mcmc-demo/app.html?algorithm=HamiltonianMC&target=banana (last access: 23 April 2026).
