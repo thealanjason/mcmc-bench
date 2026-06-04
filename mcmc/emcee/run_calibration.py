@@ -122,9 +122,7 @@ class LogLikelihood:
             model_parameters = parameters
         try:
             prediction_mean = np.asarray(self.model([[*model_parameters]]))
-            print(prediction_mean)
         except Exception:
-            print(f"MODEL_ERROR at parameters {[*model_parameters]}")
             return -np.inf
         if prediction_mean.shape != self.data.shape:
             raise ValueError("shape of model predictions does not match observations")
@@ -152,7 +150,6 @@ class LogPosterior:
     def eval(self, parameters) -> float:
         log_prior = self.log_prior.eval(parameters)
         if not np.isfinite(log_prior):
-            print("Prior_INF")
             return log_prior
         return log_prior + self.log_likelihood.eval(parameters)
 
@@ -254,15 +251,16 @@ if __name__ == "__main__":
     log_posterior = LogPosterior(log_prior, log_likelihood)
 
     # Perform MCMC Calibration
+    sampler_params = config["calibration"]["sampler_params"]
     trace, sampler, lnprob, samples = perform_mcmc(prior, log_posterior.eval,
-                nwalkers=config["calibration"]["nwalkers"],
+                nwalkers=sampler_params["emcee"]["nwalkers"],
                 nburn=config["calibration"]["nburn"],
                 nsteps=config["calibration"]["nsteps"],
-                n_workers=config["calibration"].get("n_workers", 1),
-                pool_type=config["calibration"].get("pool_type", "serial"))
-    
-    
-    
+                n_workers=sampler_params["emcee"].get("n_workers", 1),
+                pool_type=sampler_params["emcee"].get("pool_type", "serial"))
+
+
+
     print(f"MCMC completed. Trace shape: {trace.shape}")
 
     # Save results
