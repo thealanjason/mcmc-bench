@@ -117,7 +117,7 @@ def add_general_section(pdf: MCMCReport, cfg: dict):
         ("Model name",        model["name"]),
         ("Calibrated params", ", ".join(cal["parameters"])),
         ("Likelihood",        cal["likelihood"]),
-        ("MCMC walkers",      str(cal["nwalkers"])),
+        ("MCMC walkers",      str(cal["sampler_params"][cal["sampler"]]["nwalkers"])),
         ("Burn-in steps",     str(cal["nburn"])),
         ("Production steps",  str(cal["nsteps"])),
     ]
