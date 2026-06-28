@@ -1,0 +1,19 @@
+name: mcmc-dynesty
+channels:
+  - conda-forge
+dependencies:
+  - python=3.12
+  - pyyaml
+  - numpy
+  - scipy
+  - pandas
+  - corner
+  - matplotlib-base<3.11
+  - tqdm
+  - arviz=0.20
+  - h5py
+  - h5netcdf
+  - pip
+  - pip:
+    - umbridge
+    - dynesty
