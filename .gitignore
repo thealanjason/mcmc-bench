@@ -1,4 +1,6 @@
 *.nextflow*
 *work
 *outputs*
-**pyc
+*.pyc
+__pycache__/
+myTest.py
