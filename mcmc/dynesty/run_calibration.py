@@ -44,7 +44,7 @@ class Prior:
         elif distribution["type"] == "normal":
             if not all(attribute in distribution["attribute"] for attribute in ("loc", "scale")):
                 print(f"Incorrect definition of prior for parameter '{name}'",
-                    f"\nA {distribution["type"]} prior requires `loc` and `scale` attributes")
+                    f"\nA {distribution['type']} prior requires `loc` and `scale` attributes")
                 print("Aborting MCMC Calibration")
                 exit(1)
             else:
