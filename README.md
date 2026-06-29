@@ -35,7 +35,7 @@ The MCMC sampler is chosen via the `calibration.sampler` field in
 `params.yml`. Two samplers are currently available:
 ```yaml
 calibration:
-  sampler: rwmcmc   # options: emcee | rwmcmc
+  sampler: rwmcmc   # options: emcee | rwmcmc | dynesty
 ```
 Each sampler reads its own parameters from `calibration.sampler_params`,
 so you can configure them independently (e.g. `nwalkers` for emcee,
