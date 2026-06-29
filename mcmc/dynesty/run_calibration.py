@@ -55,7 +55,7 @@ class Prior:
             if not (all(attribute in distribution["attribute"] for attribute in ("loc", "scale"))
                     and any(attribute in distribution["attribute"] for attribute in ("lower_bound", "upper_bound"))):
                 print(f"Incorrect definition of prior for parameter '{name}'",
-                    f"\nA {distribution["type"]} prior requires `loc`, `scale`, `lower_bound` and/or `upper_bound` attributes")
+                    f"\nA {distribution['type']} prior requires `loc`, `scale`, `lower_bound` and/or `upper_bound` attributes")
                 print("Aborting MCMC Calibration")
                 exit(1)
             else:
