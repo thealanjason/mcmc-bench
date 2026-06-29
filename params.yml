@@ -10,7 +10,7 @@ model:
 
 
 calibration:
-  sampler: emcee # emcee or rwmcmc
+  sampler: dynesty # emcee or rwmcmc or dynesty
   sampler_params:
     rwmcmc:
         step_size: [0.05, 400] # step size for each parameter, mu and xi, respectively. I took 10% of the range. This should be modified/tuned according to the acceptance ratio from the real test.
@@ -20,6 +20,10 @@ calibration:
       nwalkers:     100
       pool_type:    process   # serial | thread | process
       n_workers:    4
+
+    dynesty:
+      nlive:        500     # number of live points; more = more accurate evidence, slower
+      dlogz:        0.01    # stopping criterion: stop when remaining ln(Z) contribution < this
 
   nburn:        1000
   nsteps:       2000
