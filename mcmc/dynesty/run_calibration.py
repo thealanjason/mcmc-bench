@@ -27,7 +27,7 @@ class Prior:
         distribution = prior_config["distribution"]
 
         if distribution["type"] not in ["uniform", "normal", "truncated_normal"]:
-            print(f"Distribution type {distribution["type"]} not yet supported")
+            print(f"Distribution type {distribution['type']} not yet supported")
             print("Aborting MCMC Calibration")
             exit(1)
 
