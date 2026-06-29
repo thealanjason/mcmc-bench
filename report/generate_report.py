@@ -113,14 +113,24 @@ def add_general_section(pdf: MCMCReport, cfg: dict):
     calibrate_noise  = cal.get("calibrate_noise", False)
     noise_parameters = cal.get("noise_parameters", [])
 
+    sampler_name = cal["sampler"]
+    sampler_cfg  = cal["sampler_params"][sampler_name]
+
+    # Sampler-specific headline parameter / I modified this part to handle the dynesty sampler, CHECKPOINT.
+    if sampler_name == "dynesty":
+        sampler_line = ("Live points (nlive)", str(sampler_cfg.get("nlive", "")))
+    else:
+        sampler_line = ("MCMC walkers", str(sampler_cfg.get("nwalkers", "")))
+
     run_lines = [
         ("Model name",        model["name"]),
         ("Calibrated params", ", ".join(cal["parameters"])),
         ("Likelihood",        cal["likelihood"]),
-        ("MCMC walkers",      str(cal["sampler_params"][cal["sampler"]]["nwalkers"])),
+        sampler_line,
         ("Burn-in steps",     str(cal["nburn"])),
         ("Production steps",  str(cal["nsteps"])),
     ]
+
     run_lines.append(("Calibrate noise", str(calibrate_noise)))
     if calibrate_noise:
         run_lines.append(("Noise parameters", ", ".join(noise_parameters)))
