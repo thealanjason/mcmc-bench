@@ -261,7 +261,7 @@ if __name__ == "__main__":
 
     # 2. corner_plot.png
     corner_plot = corner.corner(trace, labels=prior.all_parameters, show_titles=True)
-    corner_plot.savefig("corner_plot")
+    corner_plot.savefig("corner_plot.png")
     print("Corner plot saved to corner_plot.png")
 
     # 3. trace.npy
