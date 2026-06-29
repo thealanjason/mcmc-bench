@@ -63,6 +63,20 @@ workflow bpc_massflowIA {
         mcmc_trace = MCMC_CALIBRATION_RWMCMC.out.mcmc_trace
         mcmc_idata = MCMC_CALIBRATION_RWMCMC.out.mcmc_idata
     }
+
+    else if (sampler == "dynesty") {
+         MCMC_CALIBRATION_DYNESTY(
+            file("$moduleDir/mcmc/dynesty/run_calibration.py"),
+            params_yaml,
+            COLLECT_INPUTS.out.ground_truth,
+            SETUP_UM_IPC.out
+        )
+        mcmc_output = MCMC_CALIBRATION_DYNESTY.out.mcmc_output
+        mcmc_corner_plot = MCMC_CALIBRATION_DYNESTY.out.mcmc_corner_plot
+        mcmc_trace = MCMC_CALIBRATION_DYNESTY.out.mcmc_trace
+        mcmc_idata = MCMC_CALIBRATION_DYNESTY.out.mcmc_idata
+    }
+
     else{
          MCMC_CALIBRATION_EMCEE(
             file("$moduleDir/mcmc/emcee/run_calibration.py"),
@@ -226,6 +240,44 @@ process MCMC_CALIBRATION_RWMCMC {
 
 
 // Delta ends here.
+
+// Delta "dynesty" starts here:
+process MCMC_CALIBRATION_DYNESTY {
+    conda "$moduleDir/mcmc/dynesty/environment.yml"
+    cache 'lenient'
+
+    input:
+    path script
+    val config
+    path data
+    path um_highway
+
+    output:
+    path "mcmc_output.npz", emit: mcmc_output
+    path "corner_plot.png", emit: mcmc_corner_plot
+    path "trace.npy",       emit: mcmc_trace
+    path "mcmc_idata.nc",   emit: mcmc_idata
+
+    script:
+    """
+    echo "${config}" > _params.yml
+
+    echo "Waiting for model server to start..."
+    until [ -e $um_highway/model_info/READY ]; do
+        sleep 1
+    done
+    cat $um_highway/model_info/READY
+
+    MODEL_PORT=\$(ls $um_highway/umbridge_port/ | head -n 1)
+    echo "Model server is running on port \${MODEL_PORT}"
+
+    python ${script}  --config _params.yml --data ${data} --port \${MODEL_PORT}
+
+    touch $um_highway/uq_info/DONE # signal to stop the model server
+    """
+}
+
+// Delta "dynesty" ends here.
 
 process MCMC_CALIBRATION_EMCEE {
     conda "$moduleDir/mcmc/emcee/environment.yml"

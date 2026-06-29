@@ -177,6 +177,12 @@ def perform_nested_sampling(log_likelihood_eval, prior_transform, ndim, nlive, d
     sampler.run_nested(dlogz=dlogz)
     return sampler.results
 
+def parse_arguments():
+    parser = argparse.ArgumentParser(description="MCMC Calibration with dynesty")
+    parser.add_argument("--config", type=str, help="YAML configuration file")
+    parser.add_argument("--data", type=str, help="Path to data CSV")
+    parser.add_argument("--port", type=int, default=49152, help="Model server port")
+    return parser.parse_args()
 
 if __name__ == "__main__":
     args = parse_arguments()
