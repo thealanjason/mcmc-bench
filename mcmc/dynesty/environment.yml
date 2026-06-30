@@ -14,6 +14,6 @@ dependencies:
   - h5py
   - h5netcdf
   - pip
+  - dynesty
   - pip:
     - umbridge
-    - dynesty
