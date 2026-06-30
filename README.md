@@ -41,6 +41,13 @@ Each sampler reads its own parameters from `calibration.sampler_params`,
 so you can configure them independently (e.g. `nwalkers` for emcee,
 `step_size` for rwmcmc).
 
+### Parallelization (dynesty)
+
+dynesty supports parallel likelihood evaluations via the
+`sampler_params.dynesty.nprocs` field in `params.yml`. Setting
+`nprocs > 1` distributes likelihood calls across worker processes
+using Python's `multiprocessing` pool; `nprocs = 1` runs serially (default).
+
 ## References
 [1] Chi-Feng, H.: MCMC Playground – Interactive Visualization of Markov Chain Monte Carlo Algorithms, https://chi-feng.github.io/mcmc-demo/app.html?algorithm=HamiltonianMC&target=banana (last access: 23 April 2026).
 

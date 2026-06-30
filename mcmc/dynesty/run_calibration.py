@@ -18,7 +18,8 @@ import arviz as az
 
 import dynesty
 from dynesty.utils import resample_equal
-
+# from dynesty.pool import Pool
+import multiprocessing as mp
 
 class Prior:
     @staticmethod
@@ -83,7 +84,17 @@ class Prior:
         ]
 
         self.all_parameters=all_parameters
+        self.prior_transform = PriorTransform(self.distributions)
 
+class PriorTransform:
+    def __init__(self, distributions):
+        self.distributions = distributions
+        
+    def __call__(self, u):
+        theta = np.empty_like(u)
+        for i, dist in enumerate(self.distributions):
+            theta[i] = dist.ppf(u[i])
+        return theta
 
 class LogLikelihood:
     def __init__(self, model, data: np.ndarray, n_noise_parameters: int = 1, calibrate_noise: bool = True, noise_sigma=None, distribution_type: str = "normal"):
@@ -135,16 +146,9 @@ class LogLikelihood:
             exit(1)
 
 
-def make_prior_transform(prior: Prior):
 
-    def prior_transform(u):
-        theta = np.empty_like(u)
-        for i, dist in enumerate(prior.distributions):
-            theta[i] = dist.ppf(u[i])
-        return theta
-    return prior_transform
 
-def perform_nested_sampling(log_likelihood_eval, prior_transform, ndim, nlive, dlogz=0.01):
+def perform_nested_sampling(log_likelihood_eval, prior_transform, ndim, nlive, dlogz=0.01, nprocs=1):
     """Run dynesty's static Nested Sampler.
     # dynesty docs (NestedSampler API): https://dynesty.readthedocs.io/en/v3.0.0/
 
@@ -168,14 +172,32 @@ def perform_nested_sampling(log_likelihood_eval, prior_transform, ndim, nlive, d
     results : dynesty.results.Results
         Contains weighted samples, logwt (log-weights), and logz (evidence).
     """
-    sampler = dynesty.NestedSampler(
-        log_likelihood_eval,
-        prior_transform,
-        ndim,
-        nlive=nlive,
-    )
-    sampler.run_nested(dlogz=dlogz)
-    return sampler.results
+
+    # Serial run
+    if nprocs <= 1:
+        sampler = dynesty.NestedSampler(
+            log_likelihood_eval,
+            prior_transform,
+            ndim,
+            nlive=nlive,
+        )
+        sampler.run_nested(dlogz=dlogz)
+        return sampler.results
+
+    # Parallel run using standard Python multiprocessing pool
+    ctx = mp.get_context("fork")
+
+    with ctx.Pool(processes=nprocs) as pool:
+        sampler = dynesty.NestedSampler(
+            log_likelihood_eval,
+            prior_transform,
+            ndim,
+            nlive=nlive,
+            pool=pool,
+            queue_size=nprocs,
+        )
+        sampler.run_nested(dlogz=dlogz)
+        return sampler.results
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description="MCMC Calibration with dynesty")
@@ -225,14 +247,16 @@ if __name__ == "__main__":
                                     noise_sigma=config["calibration"].get("noise_sigma", None))
 
     # dynesty specific, prior transform for mapping from unit cube to parameter space
-    prior_transform = make_prior_transform(prior)
+    prior_transform = prior.prior_transform
     ndim = len(prior.all_parameters)
 
     sampler_params = config["calibration"]["sampler_params"]["dynesty"]
     nlive = sampler_params.get("nlive", 500)
     dlogz = sampler_params.get("dlogz", 0.01)
+    nprocs = sampler_params.get("nprocs", 1)
 
-    print(f"Running dynesty: ndim={ndim}, nlive={nlive}, dlogz={dlogz}")
+
+    print(f"Running dynesty: ndim={ndim}, nlive={nlive}, dlogz={dlogz}, nprocs={nprocs}")
 
     results = perform_nested_sampling(
         log_likelihood_eval=log_likelihood.eval,
@@ -240,6 +264,7 @@ if __name__ == "__main__":
         ndim=ndim,
         nlive=nlive,
         dlogz=dlogz,
+        nprocs=nprocs,
     )
 
     print(f"Nested sampling completed. logz = {results.logz[-1]:.3f} +/- {results.logzerr[-1]:.3f}")
