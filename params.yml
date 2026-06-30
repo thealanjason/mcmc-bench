@@ -22,8 +22,9 @@ calibration:
       n_workers:    4
 
     dynesty:
-      nlive:        500     # number of live points; more = more accurate evidence, slower
-      dlogz:        0.01    # stopping criterion: stop when remaining ln(Z) contribution < this
+      nlive:        1000     # number of live points; more = more accurate evidence, slower
+      dlogz:        0.005    # stopping criterion: stop when remaining ln(Z) contribution < this
+      nprocs:       1        # number of processes to use for parallelization
 
   nburn:        1000
   nsteps:       2000
