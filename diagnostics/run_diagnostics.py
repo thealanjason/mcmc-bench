@@ -129,12 +129,19 @@ def _plot_trace(idata, param_labels, output_dir):
 def _plot_autocorr(idata, param_labels, output_dir):
     param_names = list(param_labels)
     n_params = len(param_names)
-    fig, axes_flat, _, n_cols = _make_subplot_grid(n_params, n_cols=3,
-                                                   subplot_size=AUTOCORR_SUBPLOT_SIZE)
+    n_samples = (
+        idata.posterior.sizes["chain"]
+        * idata.posterior.sizes["draw"]
+    )
+    max_lag = min(MAX_AUTOCORR_LAG, n_samples)
 
+    fig, axes_flat, _, n_cols = _make_subplot_grid(n_params, n_cols=3, subplot_size=AUTOCORR_SUBPLOT_SIZE)
+    
     az.plot_autocorr(
-        idata, var_names=param_names,
-        max_lag=MAX_AUTOCORR_LAG, combined=True,
+        idata,
+        var_names=param_names,
+        max_lag=max_lag,
+        combined=True,
         ax=axes_flat[:n_params],
     )
 
