@@ -27,7 +27,7 @@ calibration:
       nprocs:       1        # number of processes to use for parallelization
 
     pymc_slice:
-      chains:        1000    
+      chains:        10    
       cores:        1    
       tune:       600        
       draws:       500
