@@ -10,7 +10,7 @@ model:
 
 
 calibration:
-  sampler: dynesty # emcee or rwmcmc or dynesty
+  sampler: pymc_slice # emcee, dynesty, rwmcmc, pymc_slice, pymc_smc
   sampler_params:
     rwmcmc:
         step_size: [0.05, 400] # step size for each parameter, mu and xi, respectively. I took 10% of the range. This should be modified/tuned according to the acceptance ratio from the real test.
@@ -25,6 +25,21 @@ calibration:
       nlive:        1000     # number of live points; more = more accurate evidence, slower
       dlogz:        0.005    # stopping criterion: stop when remaining ln(Z) contribution < this
       nprocs:       1        # number of processes to use for parallelization
+
+    pymc_slice:
+      chains:        1000    
+      cores:        1    
+      tune:       600        
+      draws:       500
+      random_seed: 42
+
+    pymc_smc:
+      draws: 100
+      chains: 4
+      cores: 1
+      threshold: 0.5
+      correlation_threshold: 0.01
+      random_seed: 42
 
   nburn:        1000
   nsteps:       2000

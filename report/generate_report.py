@@ -119,6 +119,10 @@ def add_general_section(pdf: MCMCReport, cfg: dict):
     # Sampler-specific headline parameter / I modified this part to handle the dynesty sampler, CHECKPOINT.
     if sampler_name == "dynesty":
         sampler_line = ("Live points (nlive)", str(sampler_cfg.get("nlive", "")))
+    elif sampler_name == "pymc_slice":
+        sampler_line = ("Chains", str(sampler_cfg.get("chains", "")))
+    elif sampler_name == "pymc_smc":
+        sampler_line = ("Draws", str(sampler_cfg.get("draws", "")))
     else:
         sampler_line = ("MCMC walkers", str(sampler_cfg.get("nwalkers", "")))
 
