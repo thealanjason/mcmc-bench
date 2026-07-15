@@ -132,6 +132,7 @@ process COLLECT_INPUTS {
 }
 
 process SETUP_UM_IPC {
+    cache false
     output:
     path "comm"
 
