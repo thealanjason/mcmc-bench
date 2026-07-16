@@ -26,6 +26,7 @@ plt.rcParams.update({
 N_BINS = 36
 MAX_AUTOCORR_LAG = 100
 RHAT_THRESHOLD = 1.01
+ESS_THRESHOLD = 400
 SAVE_DPI = 200
 
 TRACE_COLOR = '#8cc5e3'
@@ -43,7 +44,7 @@ POSTERIOR_SUBPLOT_SIZE = (5.0, 4.0)
 
 
 
-def run_quantitative_diagnostics(idata, param_labels, output_dir=None):
+def run_quantitative_diagnostics(idata, param_labels, sampler_name, output_dir=None):
     """
     Write R-hat and ESS convergence diagnostics to a CSV file.
 
@@ -56,11 +57,23 @@ def run_quantitative_diagnostics(idata, param_labels, output_dir=None):
         Directory for convergence_diagnostics.csv. Defaults to current directory.
     """
     param_names = list(param_labels)
-    summary = az.summary(idata, var_names=param_names)
+    summary = az.summary(idata, var_names=param_names, round_to="none")
     display = summary[["mean", "sd", "ess_bulk", "ess_tail", "r_hat"]].copy()
-    display["converged"] = display["r_hat"].apply(
-        lambda x: "PASS" if x <= RHAT_THRESHOLD else "FAIL"
-    )
+    n_chains = idata.posterior.sizes.get("chain", 1)
+    if sampler_name in {"emcee", "dynesty"} or n_chains < 2:
+        display["converged"] = "N/A"
+    else:
+        convergence_mask = (
+            display["r_hat"].notna()
+            & (display["r_hat"] < RHAT_THRESHOLD)
+            & (display["ess_bulk"] > ESS_THRESHOLD)
+            & (display["ess_tail"] > ESS_THRESHOLD)
+        )
+        display["converged"] = np.where(
+            convergence_mask,
+            "PASS",
+            "FAIL",
+        )
 
     # Use human-readable display labels as the row index
     display.index = [param_labels[p] for p in display.index]
@@ -178,7 +191,7 @@ def _plot_posteriors(idata, param_labels, output_dir):
     _save_figure(fig, output_dir, 'posteriors.png')
 
 
-def run_diagnostics(idata, param_labels=None, output_dir=None):
+def run_diagnostics(idata, sampler_name, nburn=0, param_labels=None, output_dir=None):
     """
     Create MCMC diagnostics. Qualitative plots and Quantitavie metrics 
 
@@ -192,6 +205,20 @@ def run_diagnostics(idata, param_labels=None, output_dir=None):
         Directory to save figures as PNG. Filenames are fixed:
         trace.png, autocorr.png, posteriors.png.
     """
+    if nburn < 0:
+        raise ValueError("nburn cannot be negative")
+
+    if sampler_name in {"emcee", "rwmcmc"} and nburn > 0:
+        n_draws = idata.posterior.sizes["draw"]
+
+        if nburn >= n_draws:
+            raise ValueError(
+                f"nburn ({nburn}) must be smaller than the number "
+                f"of draws ({n_draws})"
+            )
+
+        idata = idata.isel(draw=slice(nburn, None))
+
     if param_labels is None:
         param_labels = {p: p for p in idata.posterior.data_vars}
 
@@ -202,13 +229,15 @@ def run_diagnostics(idata, param_labels=None, output_dir=None):
     _plot_trace(idata, param_labels, out)
     _plot_autocorr(idata, param_labels, out)
     _plot_posteriors(idata, param_labels, out)
-    run_quantitative_diagnostics(idata, param_labels, out)
+    run_quantitative_diagnostics(idata, param_labels, sampler_name, out)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run MCMC diagnostics on a NetCDF inference data file.")
     parser.add_argument("--idata-path", type=Path, help="Path to the .nc InferenceData file.")
     parser.add_argument("--output-dir", type=Path, default=Path("."), help="Directory to write outputs (default: current directory).")
+    parser.add_argument("--sampler", required=True, choices=["emcee", "rwmcmc", "dynesty", "pymc_slice", "pymc_smc"], help="Sampler used to generate the inference data.",)
+    parser.add_argument("--nburn", type=int, default=0, help="Number of initial draws to exclude when applicable.",)
     args = parser.parse_args()
 
     idata = az.from_netcdf(args.idata_path)
-    run_diagnostics(idata, output_dir=args.output_dir)
+    run_diagnostics(idata, sampler_name=args.sampler, nburn=args.nburn, output_dir=args.output_dir)

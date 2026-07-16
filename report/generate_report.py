@@ -1,6 +1,7 @@
 import argparse
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import yaml
 from fpdf import FPDF
@@ -32,8 +33,34 @@ def parse_params(params_path: Path) -> dict:
     with open(params_path) as f:
         return yaml.safe_load(f)
 
+def parse_sampling_time(results_path: Path) -> float:
+    if not results_path.exists():
+        return None
+
+    with np.load(results_path) as results:
+        if "sampling_time_seconds" not in results.files:
+            return None
+        return float(results["sampling_time_seconds"])
+
+def parse_convergence_status(csv_path: Path) -> str:
+    if not csv_path.exists():
+        return "N/A"
+
+    diagnostics = pd.read_csv(csv_path, keep_default_na=False)
+    if diagnostics.empty or "converged" not in diagnostics.columns:
+        return "N/A"
+
+    statuses = diagnostics["converged"].astype(str).str.upper()
+
+    if (statuses == "FAIL").any():
+        return "FAIL"
+    if (statuses == "PASS").all():
+        return "PASS"
+    return "N/A"
 
 def rhat_label(value: float) -> tuple:
+    if pd.isna(value):
+        return "N/A", COLOR_HEADER
     if value < RHAT_EXCELLENT:
         return "Excellent", COLOR_EXCELLENT
     elif value < RHAT_GOOD:
@@ -93,7 +120,7 @@ class MCMCReport(FPDF):
         self.ln(4)
 
 
-def add_general_section(pdf: MCMCReport, cfg: dict):
+def add_general_section(pdf: MCMCReport, cfg: dict, sampling_time_seconds: float | None, convergence_status: str,):
     pdf.add_page()
     pdf.section_title("1. Run Information")
 
@@ -126,14 +153,24 @@ def add_general_section(pdf: MCMCReport, cfg: dict):
     else:
         sampler_line = ("MCMC walkers", str(sampler_cfg.get("nwalkers", "")))
 
+    sampling_time_text = (
+        f"{sampling_time_seconds:.3f} s" if sampling_time_seconds is not None
+        else "N/A"
+    )
+
     run_lines = [
         ("Model name",        model["name"]),
         ("Calibrated params", ", ".join(cal["parameters"])),
         ("Likelihood",        cal["likelihood"]),
         sampler_line,
-        ("Burn-in steps",     str(cal["nburn"])),
-        ("Production steps",  str(cal["nsteps"])),
+        ("Sampling run-time", sampling_time_text),
+        ("Convergence status", convergence_status),
     ]
+    if sampler_name in {"emcee", "rwmcmc"}:
+        run_lines.extend([
+            ("Burn-in steps", str(cal["nburn"])),
+            ("Production steps", str(cal["nsteps"] - cal["nburn"])),
+        ])
 
     run_lines.append(("Calibrate noise", str(calibrate_noise)))
     if calibrate_noise:
@@ -226,6 +263,7 @@ def add_diagnostics_table(pdf: MCMCReport, csv_path: Path):
         ess_bulk_text, ess_bulk_color = ess_label(ess_bulk)
         ess_tail_text, ess_tail_color = ess_label(ess_tail)
         rhat_text,     rhat_color     = rhat_label(rhat)
+        rhat_value = "N/A" if pd.isna(rhat) else f"{rhat:.4f}"
 
         # ESS quality uses the worse of bulk/tail
         ess_quality_text  = ess_bulk_text if ess_bulk <= ess_tail else ess_tail_text
@@ -237,7 +275,7 @@ def add_diagnostics_table(pdf: MCMCReport, csv_path: Path):
             (f"{float(row['sd']):.4f}",   None,           "R"),
             (f"{ess_bulk:.0f}",         ess_bulk_color,   "R"),
             (f"{ess_tail:.0f}",         ess_tail_color,   "R"),
-            (f"{rhat:.4f}",             rhat_color,       "R"),
+            (rhat_value,                rhat_color,       "R"),
             (ess_quality_text,          ess_quality_color,"C"),
             (rhat_text,                 rhat_color,       "C"),
         ]
@@ -257,11 +295,16 @@ def main():
     output_path = args.output if args.output else Path("report.pdf")
 
     cfg = parse_params(bundle_dir / "_params.yml")
+    sampling_time_seconds = parse_sampling_time(
+        bundle_dir / "mcmc_output.npz"
+    )
     title = f"Calibration Report / {cfg['model']['name']}"
     session_id = next(p for p in bundle_dir.name.split("_") if "-" in p)
-
+    convergence_status = parse_convergence_status(
+        bundle_dir / "diagnostics" / "convergence_diagnostics.csv"
+    )
     pdf = MCMCReport(title=title, session_id=session_id)
-    add_general_section(pdf, cfg)
+    add_general_section(pdf, cfg, sampling_time_seconds, convergence_status,)
     pdf.embed_image(
         bundle_dir / "corner_plot.png",
         caption="Figure 1 - Pairwise posterior corner plot.",

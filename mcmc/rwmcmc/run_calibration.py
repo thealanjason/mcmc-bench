@@ -1,3 +1,4 @@
+import time
 import yaml
 import numpy as np
 import pandas as pd
@@ -319,6 +320,8 @@ if __name__ == "__main__":
     print(f"Running {nchains} chains x {nsteps} steps ({nburn} burn-in)")
     print(f"step_size: {step_size_cfg}")
 
+    sampling_started_at = time.perf_counter()
+
     samples_all, accepted_all = perform_mcmc(
         prior=prior,
         log_posterior_eval=log_posterior.eval,
@@ -327,8 +330,11 @@ if __name__ == "__main__":
         step_size=step_size_cfg,
     )
 
+    sampling_time_seconds = time.perf_counter() - sampling_started_at
+
     print(f"MCMC completed. Samples shape: {samples_all.shape}")
     print(f"Overall acceptance rate: {accepted_all.mean():.2%}")
+    print(f"Sampling runtime: {sampling_time_seconds:.3f} s")
     
     
     # SAVE RESULTS
@@ -343,9 +349,14 @@ if __name__ == "__main__":
     # Just a placeholder, otherwise we will get an error.
     lnprob = np.zeros((nchains, nsteps-nburn))
 
-    np.savez(f"mcmc_output.npz", 
-                trace=trace, samples=samples_post_burn, lnprob=lnprob)
-    print(f"Results saved to mcmc_output.npz")
+    np.savez(
+        "mcmc_output.npz",
+        trace=trace,
+        samples=samples_post_burn,
+        lnprob=lnprob,
+        sampling_time_seconds=sampling_time_seconds,
+    )
+    print("Results saved to mcmc_output.npz")
 
     corner_plot = corner.corner(trace, labels=prior.all_parameters, show_titles=True)
     corner_plot.savefig(f"corner_plot")

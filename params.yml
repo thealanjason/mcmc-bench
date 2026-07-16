@@ -10,39 +10,39 @@ model:
 
 
 calibration:
-  sampler: pymc_slice # emcee, dynesty, rwmcmc, pymc_slice, pymc_smc
+  sampler: rwmcmc # emcee, dynesty, rwmcmc, pymc_slice, pymc_smc
   sampler_params:
     rwmcmc:
-        step_size: [0.05, 400] # step size for each parameter, mu and xi, respectively. I took 10% of the range. This should be modified/tuned according to the acceptance ratio from the real test.
-        nwalkers:     1
+        step_size: [0.15, 1200] # step size for each parameter, mu and xi, respectively. I took 10% of the range. This should be modified/tuned according to the acceptance ratio from the real test. Okay so I tested it, this gives the best results for efficiency and acceptance ratio. I will keep it for now.
+        nwalkers:     2
 
     emcee:
-      nwalkers:     100
-      pool_type:    process   # serial | thread | process
-      n_workers:    4
+      nwalkers:     8
+      pool_type:    serial   # serial | thread | process
+      n_workers:    1
 
     dynesty:
-      nlive:        1000     # number of live points; more = more accurate evidence, slower
-      dlogz:        0.005    # stopping criterion: stop when remaining ln(Z) contribution < this
+      nlive:        500     # number of live points; more = more accurate evidence, slower
+      dlogz:        0.5    # stopping criterion: stop when remaining ln(Z) contribution < this
       nprocs:       1        # number of processes to use for parallelization
 
     pymc_slice:
-      chains:        10    
-      cores:        1    
-      tune:       600        
-      draws:       500
+      chains:        2
+      cores:        1
+      tune:       1000
+      draws:       1000
       random_seed: 42
 
     pymc_smc:
-      draws: 100
-      chains: 4
+      draws: 2000
+      chains: 2
       cores: 1
       threshold: 0.5
       correlation_threshold: 0.01
       random_seed: 42
 
   nburn:        1000
-  nsteps:       2000
+  nsteps:       5000
   parameters: ["mu", "xi"] 
   noise_parameters: ["sigma"]
   calibrate_noise: false

@@ -44,6 +44,7 @@ workflow bpc_massflowIA {
     )
 
     def sampler = params.calibration?.sampler ?: "emcee" // default to emcee if not specified
+    def nburn = params.calibration?.nburn ?: 0
     println "Sampler (default: emcee): ${sampler}"
 
     def mcmc_output
@@ -120,6 +121,8 @@ workflow bpc_massflowIA {
     RUN_DIAGNOSTICS(
         file("$moduleDir/diagnostics/run_diagnostics.py"),
         mcmc_idata,
+        sampler,
+        nburn,
         "diagnostics"
     )
 
@@ -426,6 +429,8 @@ process RUN_DIAGNOSTICS {
     input:
     path script
     path mcmc_idata
+    val sampler_name
+    val nburn
     val outdir
 
     output:
@@ -434,7 +439,7 @@ process RUN_DIAGNOSTICS {
     script:
     """
     #!/bin/bash
-    python3 ${script} --idata-path ${mcmc_idata} --output-dir "${outdir}"
+    python3 ${script} --idata-path ${mcmc_idata}  --sampler "${sampler_name}" --nburn "${nburn}" --output-dir "${outdir}"
     """
 }
 
