@@ -7,7 +7,7 @@ dependencies:
   - numpy
   - pandas
   - scipy
-  - matplotlib
+  - matplotlib-base<3.11
   - seaborn
   - h5py
   - h5netcdf

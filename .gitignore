@@ -5,3 +5,5 @@
 __pycache__/
 mcmc_output.npz
 trace.npy
+benchmark_logs/
+params.yml.tour_backup
