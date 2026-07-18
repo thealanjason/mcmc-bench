@@ -29,12 +29,12 @@ calibration:
     pymc_slice:
       chains:        2
       cores:        1
-      tune:       1000
-      draws:       1000
+      tune:       1000  # burn-in draws 
+      draws:       4000 # successful draws (tune + draws = total draws)
       random_seed: 42
 
     pymc_smc:
-      draws: 2000
+      draws: 2000 # number of draws per chain (success)
       chains: 2
       cores: 1
       threshold: 0.5

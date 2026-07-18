@@ -44,7 +44,7 @@ POSTERIOR_SUBPLOT_SIZE = (5.0, 4.0)
 
 
 
-def run_quantitative_diagnostics(idata, param_labels, sampler_name, output_dir=None):
+def run_quantitative_diagnostics(idata, param_labels, sampler_name, output_dir=None, n_model_calls=None, sampling_time_seconds=None):
     """
     Write R-hat and ESS convergence diagnostics to a CSV file.
 
@@ -59,6 +59,15 @@ def run_quantitative_diagnostics(idata, param_labels, sampler_name, output_dir=N
     param_names = list(param_labels)
     summary = az.summary(idata, var_names=param_names, round_to="none")
     display = summary[["mean", "sd", "ess_bulk", "ess_tail", "r_hat"]].copy()
+    # We use either number of calls or sampling duration
+    if n_model_calls:
+        display["ess_per_call"] = display["ess_bulk"] / n_model_calls
+    else:
+        display["ess_per_call"] = np.nan
+    if sampling_time_seconds:
+        display["ess_per_second"] = display["ess_bulk"] / sampling_time_seconds
+    else:
+        display["ess_per_second"] = np.nan
     n_chains = idata.posterior.sizes.get("chain", 1)
     if sampler_name in {"emcee", "dynesty"} or n_chains < 2:
         display["converged"] = "N/A"
@@ -191,7 +200,7 @@ def _plot_posteriors(idata, param_labels, output_dir):
     _save_figure(fig, output_dir, 'posteriors.png')
 
 
-def run_diagnostics(idata, sampler_name, nburn=0, param_labels=None, output_dir=None):
+def run_diagnostics(idata, sampler_name, nburn=0, param_labels=None, output_dir=None, n_model_calls=None, sampling_time_seconds=None):
     """
     Create MCMC diagnostics. Qualitative plots and Quantitavie metrics 
 
@@ -229,7 +238,9 @@ def run_diagnostics(idata, sampler_name, nburn=0, param_labels=None, output_dir=
     _plot_trace(idata, param_labels, out)
     _plot_autocorr(idata, param_labels, out)
     _plot_posteriors(idata, param_labels, out)
-    run_quantitative_diagnostics(idata, param_labels, sampler_name, out)
+    run_quantitative_diagnostics(idata, param_labels, sampler_name, out,
+                                 n_model_calls=n_model_calls,
+                                 sampling_time_seconds=sampling_time_seconds)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run MCMC diagnostics on a NetCDF inference data file.")
@@ -237,7 +248,23 @@ if __name__ == "__main__":
     parser.add_argument("--output-dir", type=Path, default=Path("."), help="Directory to write outputs (default: current directory).")
     parser.add_argument("--sampler", required=True, choices=["emcee", "rwmcmc", "dynesty", "pymc_slice", "pymc_smc"], help="Sampler used to generate the inference data.",)
     parser.add_argument("--nburn", type=int, default=0, help="Number of initial draws to exclude when applicable.",)
+    parser.add_argument("--ncalls-path", type=Path, default=None, help="Path to n_calls.txt written by the model server.")
+    parser.add_argument("--npz-path", type=Path, default=None, help="Path to mcmc_output.npz (for sampling_time_seconds).")
     args = parser.parse_args()
 
+    # We check whether the files exist before passing the metrics on.
+    n_model_calls = None
+    if args.ncalls_path is not None and args.ncalls_path.exists():
+        n_model_calls = int(args.ncalls_path.read_text().strip())
+
+    sampling_time_seconds = None
+    if args.npz_path is not None and args.npz_path.exists():
+        with np.load(args.npz_path) as npz:
+            if "sampling_time_seconds" in npz.files:
+                sampling_time_seconds = float(npz["sampling_time_seconds"])
+
     idata = az.from_netcdf(args.idata_path)
-    run_diagnostics(idata, sampler_name=args.sampler, nburn=args.nburn, output_dir=args.output_dir)
+    run_diagnostics(idata, sampler_name=args.sampler, nburn=args.nburn,
+                    output_dir=args.output_dir,
+                    n_model_calls=n_model_calls,
+                    sampling_time_seconds=sampling_time_seconds)

@@ -24,12 +24,15 @@ numpy2ri.activate = lambda: _rpy2_converter().__enter__()
 class SurrogateModel(umbridge.Model):
     
     
-    def __init__(self, name, surrogate_model, input_dim, output_dim, debug=False):
+    def __init__(self, name, surrogate_model, input_dim, output_dim, debug=False, ncalls_file="n_calls.txt", log_every=100):
         self.name = name
         self.model = surrogate_model
         self.input_dim = input_dim
         self.output_dim = output_dim
         self.evaluate_func = self.debug_evaluate if debug else self.evaluate
+        self.n_calls = 0
+        self.ncalls_file = ncalls_file
+        self.log_every = log_every
 
     def get_input_sizes(self, config):
         return self.input_dim
@@ -39,11 +42,16 @@ class SurrogateModel(umbridge.Model):
 
     def __call__(self, parameters, config):
         try:
-            return self.evaluate_func(parameters)
+            result = self.evaluate_func(parameters)
         except Exception as e:
             print(f"Error in model: {e}")
             raise e
-
+        self.n_calls += len(parameters) # Every time model is called increase the number of calls and write it
+        with open(self.ncalls_file, "w") as f:
+            f.write(f"{self.n_calls}\n")
+        if self.n_calls % self.log_every < len(parameters): # Just to see how many calls with low frequency prints
+            print(f"Likelihood calls so far: {self.n_calls}", flush=True)
+        return result
     def supports_evaluate(self):
         return True
     
@@ -72,6 +80,8 @@ class SurrogateModel(umbridge.Model):
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description='Surrogate Model UMBridge Server')
+    parser.add_argument('--ncalls-file', type=str, default='n_calls.txt',
+                       help='File to write the running likelihood-call count')
     parser.add_argument('--port', type=int, default=49152,
                        help='Server port')
     parser.add_argument('--config', type=str, default='config.yml',
@@ -103,7 +113,7 @@ def main():
     print(f"Model: {name}")
 
     # Create the model instance
-    model = SurrogateModel(name, surrogate_model, input_dim, output_dim, debug=debug)
+    model = SurrogateModel(name, surrogate_model, input_dim, output_dim, debug=debug, ncalls_file=args.ncalls_file)
     print(f"Successfully created model: {model.name}")
 
     # Serve the model
