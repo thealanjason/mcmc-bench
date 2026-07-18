@@ -143,6 +143,7 @@ workflow bpc_massflowIA {
         mcmc_corner_plot,
         mcmc_trace,
         mcmc_idata,
+        mcmc_ncalls,
         RUN_DIAGNOSTICS.out
     )
 
@@ -468,6 +469,7 @@ process BUNDLE_OUTPUTS {
     path mcmc_corner_plot
     path mcmc_trace
     path mcmc_idata
+    path mcmc_ncalls
     path mcmc_diagnostics
 
     output:
@@ -485,6 +487,7 @@ process BUNDLE_OUTPUTS {
     cp ${mcmc_corner_plot} "${bundle_name}/"
     cp ${mcmc_trace} "${bundle_name}/"
     cp ${mcmc_idata} "${bundle_name}/"
+    cp ${mcmc_ncalls} "${bundle_name}/"
     cp -r ${mcmc_diagnostics} "${bundle_name}/"
 
     mkdir -p "${output_base_dir}"

@@ -42,6 +42,33 @@ def parse_sampling_time(results_path: Path) -> float:
             return None
         return float(results["sampling_time_seconds"])
 
+
+def parse_n_calls(path: Path):
+    if not path.exists():
+        return None
+    try:
+        return int(path.read_text().strip())
+    except ValueError:
+        return None
+
+
+def parse_efficiency(csv_path: Path):
+    """(parameter, ess_per_call, ess_per_second)"""
+    if not csv_path.exists():
+        return []
+    df = pd.read_csv(csv_path)
+    if "ess_per_call" not in df.columns or "ess_per_second" not in df.columns:
+        return []
+    rows = []
+    for _, row in df.iterrows():
+        rows.append((
+            str(row["parameter"]),
+            None if pd.isna(row["ess_per_call"]) else float(row["ess_per_call"]),
+            None if pd.isna(row["ess_per_second"]) else float(row["ess_per_second"]),
+        ))
+    return rows
+
+
 def parse_convergence_status(csv_path: Path) -> str:
     if not csv_path.exists():
         return "N/A"
@@ -120,7 +147,7 @@ class MCMCReport(FPDF):
         self.ln(4)
 
 
-def add_general_section(pdf: MCMCReport, cfg: dict, sampling_time_seconds: float | None, convergence_status: str,):
+def add_general_section(pdf: MCMCReport, cfg: dict, sampling_time_seconds: float | None, convergence_status: str, n_calls: int | None, efficiency_rows: list,):
     pdf.add_page()
     pdf.section_title("1. Run Information")
 
@@ -158,6 +185,24 @@ def add_general_section(pdf: MCMCReport, cfg: dict, sampling_time_seconds: float
         else "N/A"
     )
 
+    def _fmt(value, spec):
+        return format(value, spec) if value is not None else "N/A"
+
+    efficiency_lines = [("Model likelihood calls",
+                         str(n_calls) if n_calls is not None else "N/A")]
+    for name, epc, _ in efficiency_rows:
+        efficiency_lines.append((f"ESS / model call ({name})", _fmt(epc, ".4f")))
+    epc_vals = [epc for _, epc, _ in efficiency_rows if epc is not None]
+    if efficiency_rows:
+        efficiency_lines.append(("ESS / model call (min)",
+                                 _fmt(min(epc_vals) if epc_vals else None, ".4f")))
+    for name, _, eps in efficiency_rows:
+        efficiency_lines.append((f"ESS / second ({name})", _fmt(eps, ".1f")))
+    eps_vals = [eps for _, _, eps in efficiency_rows if eps is not None]
+    if efficiency_rows:
+        efficiency_lines.append(("ESS / second (min)",
+                                 _fmt(min(eps_vals) if eps_vals else None, ".1f")))
+
     run_lines = [
         ("Model name",        model["name"]),
         ("Calibrated params", ", ".join(cal["parameters"])),
@@ -165,6 +210,7 @@ def add_general_section(pdf: MCMCReport, cfg: dict, sampling_time_seconds: float
         sampler_line,
         ("Sampling run-time", sampling_time_text),
         ("Convergence status", convergence_status),
+        *efficiency_lines,
     ]
     if sampler_name in {"emcee", "rwmcmc"}:
         run_lines.extend([
@@ -304,7 +350,12 @@ def main():
         bundle_dir / "diagnostics" / "convergence_diagnostics.csv"
     )
     pdf = MCMCReport(title=title, session_id=session_id)
-    add_general_section(pdf, cfg, sampling_time_seconds, convergence_status,)
+    n_calls = parse_n_calls(bundle_dir / "n_calls.txt")
+    efficiency_rows = parse_efficiency(
+        bundle_dir / "diagnostics" / "convergence_diagnostics.csv"
+    )
+    add_general_section(pdf, cfg, sampling_time_seconds, convergence_status,
+                        n_calls, efficiency_rows,)
     pdf.embed_image(
         bundle_dir / "corner_plot.png",
         caption="Figure 1 - Pairwise posterior corner plot.",
