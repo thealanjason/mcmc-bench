@@ -3,3 +3,5 @@
 *outputs*
 *.pyc
 __pycache__/
+mcmc_output.npz
+trace.npy
