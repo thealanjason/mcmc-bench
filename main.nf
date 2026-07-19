@@ -77,6 +77,32 @@ workflow bpc_massflowIA {
         mcmc_idata = MCMC_CALIBRATION_DYNESTY.out.mcmc_idata
     }
 
+    else if (sampler == "pymc_slice") {
+         MCMC_CALIBRATION_PYMC_SLICE(
+            file("$moduleDir/mcmc/pymc_slice/run_calibration.py"),
+            params_yaml,
+            COLLECT_INPUTS.out.ground_truth,
+            SETUP_UM_IPC.out
+        )
+        mcmc_output = MCMC_CALIBRATION_PYMC_SLICE.out.mcmc_output
+        mcmc_corner_plot = MCMC_CALIBRATION_PYMC_SLICE.out.mcmc_corner_plot
+        mcmc_trace = MCMC_CALIBRATION_PYMC_SLICE.out.mcmc_trace
+        mcmc_idata = MCMC_CALIBRATION_PYMC_SLICE.out.mcmc_idata
+    }
+
+    else if (sampler == "pymc_smc") {
+         MCMC_CALIBRATION_PYMC_SMC(
+            file("$moduleDir/mcmc/pymc_smc/run_calibration.py"),
+            params_yaml,
+            COLLECT_INPUTS.out.ground_truth,
+            SETUP_UM_IPC.out
+        )
+        mcmc_output = MCMC_CALIBRATION_PYMC_SMC.out.mcmc_output
+        mcmc_corner_plot = MCMC_CALIBRATION_PYMC_SMC.out.mcmc_corner_plot
+        mcmc_trace = MCMC_CALIBRATION_PYMC_SMC.out.mcmc_trace
+        mcmc_idata = MCMC_CALIBRATION_PYMC_SMC.out.mcmc_idata
+    }
+
     else{
          MCMC_CALIBRATION_EMCEE(
             file("$moduleDir/mcmc/emcee/run_calibration.py"),
@@ -132,6 +158,7 @@ process COLLECT_INPUTS {
 }
 
 process SETUP_UM_IPC {
+    cache false
     output:
     path "comm"
 
@@ -313,6 +340,85 @@ process MCMC_CALIBRATION_EMCEE {
     touch $um_highway/uq_info/DONE # signal to stop the model server
     """
 }
+
+// PYMC_SLICE starts here
+
+process MCMC_CALIBRATION_PYMC_SLICE {
+    conda "$moduleDir/mcmc/pymc_slice/environment.yml"
+    cache 'lenient'
+
+    input:
+    path script
+    val config
+    path data
+    path um_highway
+
+    output:
+    path "mcmc_output.npz", emit: mcmc_output
+    path "corner_plot.png", emit: mcmc_corner_plot
+    path "trace.npy",       emit: mcmc_trace
+    path "mcmc_idata.nc",   emit: mcmc_idata
+
+    script:
+    """
+    echo "${config}" > _params.yml
+
+    echo "Waiting for model server to start..."
+    until [ -e $um_highway/model_info/READY ]; do
+        sleep 1
+    done
+    cat $um_highway/model_info/READY
+
+    MODEL_PORT=\$(ls $um_highway/umbridge_port/ | head -n 1)
+    echo "Model server is running on port \${MODEL_PORT}"
+
+    python ${script}  --config _params.yml --data ${data} --port \${MODEL_PORT}
+
+    touch $um_highway/uq_info/DONE # signal to stop the model server
+    """
+}
+
+// PYMC_SLICE ends here
+
+// PYMC_smc starts here
+
+process MCMC_CALIBRATION_PYMC_SMC {
+    conda "$moduleDir/mcmc/pymc_smc/environment.yml"
+    cache 'lenient'
+
+    input:
+    path script
+    val config
+    path data
+    path um_highway
+
+    output:
+    path "mcmc_output.npz", emit: mcmc_output
+    path "corner_plot.png", emit: mcmc_corner_plot
+    path "trace.npy",       emit: mcmc_trace
+    path "mcmc_idata.nc",   emit: mcmc_idata
+
+    script:
+    """
+    echo "${config}" > _params.yml
+
+    echo "Waiting for model server to start..."
+    until [ -e $um_highway/model_info/READY ]; do
+        sleep 1
+    done
+    cat $um_highway/model_info/READY
+
+    MODEL_PORT=\$(ls $um_highway/umbridge_port/ | head -n 1)
+    echo "Model server is running on port \${MODEL_PORT}"
+
+    python ${script}  --config _params.yml --data ${data} --port \${MODEL_PORT}
+
+    touch $um_highway/uq_info/DONE # signal to stop the model server
+    """
+}
+
+// PYMC_smc ends here
+
 
 process RUN_DIAGNOSTICS {
     conda "$moduleDir/diagnostics/environment.yml"
