@@ -44,7 +44,7 @@ POSTERIOR_SUBPLOT_SIZE = (5.0, 4.0)
 
 
 
-def run_quantitative_diagnostics(idata, param_labels, sampler_name, output_dir=None, n_model_calls=None, sampling_time_seconds=None):
+def run_quantitative_diagnostics(idata, param_labels, sampler_name, output_dir=None, n_model_calls=None, sampling_time_seconds=None, kish_ess=None):
     """
     Write R-hat and ESS convergence diagnostics to a CSV file.
 
@@ -60,14 +60,21 @@ def run_quantitative_diagnostics(idata, param_labels, sampler_name, output_dir=N
     summary = az.summary(idata, var_names=param_names, round_to="none")
     display = summary[["mean", "sd", "ess_bulk", "ess_tail", "r_hat"]].copy()
     # We use either number of calls or sampling duration
+    # For weighted-sample outputs (nested sampling) the ArviZ ESS is computed on
+    # the equal-weight resample and overstates the information content. Use the
+    # Kish ESS as the numerator when the sampler provides one.
+    display["ess_kish"] = kish_ess if kish_ess is not None else np.nan
+    ess_for_efficiency = kish_ess if kish_ess is not None else display["ess_bulk"]
+
     if n_model_calls:
-        display["ess_per_call"] = display["ess_bulk"] / n_model_calls
+        display["ess_per_call"] = ess_for_efficiency / n_model_calls
     else:
         display["ess_per_call"] = np.nan
     if sampling_time_seconds:
-        display["ess_per_second"] = display["ess_bulk"] / sampling_time_seconds
+        display["ess_per_second"] = ess_for_efficiency / sampling_time_seconds
     else:
         display["ess_per_second"] = np.nan
+        
     n_chains = idata.posterior.sizes.get("chain", 1)
     if sampler_name in {"emcee", "dynesty"} or n_chains < 2:
         display["converged"] = "N/A"
@@ -200,7 +207,7 @@ def _plot_posteriors(idata, param_labels, output_dir):
     _save_figure(fig, output_dir, 'posteriors.png')
 
 
-def run_diagnostics(idata, sampler_name, nburn=0, param_labels=None, output_dir=None, n_model_calls=None, sampling_time_seconds=None):
+def run_diagnostics(idata, sampler_name, nburn=0, param_labels=None, output_dir=None, n_model_calls=None, sampling_time_seconds=None, kish_ess=None):
     """
     Create MCMC diagnostics. Qualitative plots and Quantitavie metrics 
 
@@ -240,7 +247,7 @@ def run_diagnostics(idata, sampler_name, nburn=0, param_labels=None, output_dir=
     _plot_posteriors(idata, param_labels, out)
     run_quantitative_diagnostics(idata, param_labels, sampler_name, out,
                                  n_model_calls=n_model_calls,
-                                 sampling_time_seconds=sampling_time_seconds)
+                                 sampling_time_seconds=sampling_time_seconds, kish_ess=kish_ess)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run MCMC diagnostics on a NetCDF inference data file.")
@@ -258,13 +265,15 @@ if __name__ == "__main__":
         n_model_calls = int(args.ncalls_path.read_text().strip())
 
     sampling_time_seconds = None
+    kish_ess = None
     if args.npz_path is not None and args.npz_path.exists():
         with np.load(args.npz_path) as npz:
             if "sampling_time_seconds" in npz.files:
                 sampling_time_seconds = float(npz["sampling_time_seconds"])
-
+            if "kish_ess" in npz.files:
+                kish_ess = float(npz["kish_ess"])
     idata = az.from_netcdf(args.idata_path)
     run_diagnostics(idata, sampler_name=args.sampler, nburn=args.nburn,
                     output_dir=args.output_dir,
                     n_model_calls=n_model_calls,
-                    sampling_time_seconds=sampling_time_seconds)
+                    sampling_time_seconds=sampling_time_seconds, kish_ess=kish_ess)
