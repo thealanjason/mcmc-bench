@@ -16,4 +16,4 @@ dependencies:
   - pip
   - pip:
     - umbridge
-    - git+https://github.com/korkmazgoz-caglar/random-walk-mcmc.git@main
+    - git+https://github.com/korkmazgoz-caglar/random-walk-mcmc.git@v0.1.1
