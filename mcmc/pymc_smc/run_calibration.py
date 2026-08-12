@@ -1,3 +1,4 @@
+import time
 import yaml
 import numpy as np
 import pandas as pd
@@ -251,6 +252,8 @@ if __name__ == "__main__":
     if draws <= 0:
         raise ValueError("PyMC draws must be greater than zero")
 
+    sampling_started_at = time.perf_counter()
+
     trace, idata, lnprob, samples = perform_mcmc(
         prior,
         log_likelihood,
@@ -265,12 +268,20 @@ if __name__ == "__main__":
         random_seed=sampler_config.get("random_seed"),
     )
 
+    sampling_time_seconds = time.perf_counter() - sampling_started_at
 
 
     print(f"SMC completed. Trace shape: {trace.shape}")
+    print(f"Sampling runtime: {sampling_time_seconds:.3f} s")
 
     # Save results
-    np.savez("mcmc_output.npz", trace=trace, samples=samples, lnprob=lnprob)
+    np.savez(
+        "mcmc_output.npz",
+        trace=trace,
+        samples=samples,
+        lnprob=lnprob,
+        sampling_time_seconds=sampling_time_seconds,
+    )
     print("Results saved to mcmc_output.npz")
 
     corner_plot = corner.corner(

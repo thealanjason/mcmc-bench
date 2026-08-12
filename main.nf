@@ -44,13 +44,15 @@ workflow bpc_massflowIA {
     )
 
     def sampler = params.calibration?.sampler ?: "emcee" // default to emcee if not specified
+    def nburn = params.calibration?.nburn ?: 0
     println "Sampler (default: emcee): ${sampler}"
 
     def mcmc_output
     def mcmc_corner_plot
     def mcmc_trace
     def mcmc_idata
-    
+    def mcmc_ncalls
+
     if (sampler == "rwmcmc") {
          MCMC_CALIBRATION_RWMCMC(
             file("$moduleDir/mcmc/rwmcmc/run_calibration.py"),
@@ -62,6 +64,7 @@ workflow bpc_massflowIA {
         mcmc_corner_plot = MCMC_CALIBRATION_RWMCMC.out.mcmc_corner_plot
         mcmc_trace = MCMC_CALIBRATION_RWMCMC.out.mcmc_trace
         mcmc_idata = MCMC_CALIBRATION_RWMCMC.out.mcmc_idata
+        mcmc_ncalls = MCMC_CALIBRATION_RWMCMC.out.n_calls
     }
 
     else if (sampler == "dynesty") {
@@ -75,6 +78,7 @@ workflow bpc_massflowIA {
         mcmc_corner_plot = MCMC_CALIBRATION_DYNESTY.out.mcmc_corner_plot
         mcmc_trace = MCMC_CALIBRATION_DYNESTY.out.mcmc_trace
         mcmc_idata = MCMC_CALIBRATION_DYNESTY.out.mcmc_idata
+        mcmc_ncalls = MCMC_CALIBRATION_DYNESTY.out.n_calls
     }
 
     else if (sampler == "pymc_slice") {
@@ -88,6 +92,7 @@ workflow bpc_massflowIA {
         mcmc_corner_plot = MCMC_CALIBRATION_PYMC_SLICE.out.mcmc_corner_plot
         mcmc_trace = MCMC_CALIBRATION_PYMC_SLICE.out.mcmc_trace
         mcmc_idata = MCMC_CALIBRATION_PYMC_SLICE.out.mcmc_idata
+        mcmc_ncalls = MCMC_CALIBRATION_PYMC_SLICE.out.n_calls
     }
 
     else if (sampler == "pymc_smc") {
@@ -101,6 +106,7 @@ workflow bpc_massflowIA {
         mcmc_corner_plot = MCMC_CALIBRATION_PYMC_SMC.out.mcmc_corner_plot
         mcmc_trace = MCMC_CALIBRATION_PYMC_SMC.out.mcmc_trace
         mcmc_idata = MCMC_CALIBRATION_PYMC_SMC.out.mcmc_idata
+        mcmc_ncalls = MCMC_CALIBRATION_PYMC_SMC.out.n_calls
     }
 
     else{
@@ -114,12 +120,17 @@ workflow bpc_massflowIA {
         mcmc_corner_plot = MCMC_CALIBRATION_EMCEE.out.mcmc_corner_plot
         mcmc_trace = MCMC_CALIBRATION_EMCEE.out.mcmc_trace
         mcmc_idata = MCMC_CALIBRATION_EMCEE.out.mcmc_idata
+        mcmc_ncalls = MCMC_CALIBRATION_EMCEE.out.n_calls
     }
 
     // These are hard-coded to emcee, I should modify. Done!
     RUN_DIAGNOSTICS(
         file("$moduleDir/diagnostics/run_diagnostics.py"),
         mcmc_idata,
+        mcmc_output,
+        mcmc_ncalls,
+        sampler,
+        nburn,
         "diagnostics"
     )
 
@@ -132,6 +143,7 @@ workflow bpc_massflowIA {
         mcmc_corner_plot,
         mcmc_trace,
         mcmc_idata,
+        mcmc_ncalls,
         RUN_DIAGNOSTICS.out
     )
 
@@ -199,7 +211,7 @@ process SERVE_MODEL {
     fi
 
     # Start model server
-    python ${script} --config _server_config.yml --port \$UMBRIDGE_PORT &
+    python ${script} --config _server_config.yml --port \$UMBRIDGE_PORT --ncalls-file $um_highway/model_info/n_calls.txt &
     SERVER_PID=\$!
     trap 'kill \$SERVER_PID 2>/dev/null || true' EXIT INT TERM
     echo "Model Server PID: \$SERVER_PID (trying port \$UMBRIDGE_PORT)"
@@ -245,6 +257,7 @@ process MCMC_CALIBRATION_RWMCMC {
     path "corner_plot.png", emit: mcmc_corner_plot
     path "trace.npy",       emit: mcmc_trace
     path "mcmc_idata.nc",   emit: mcmc_idata
+    path "n_calls.txt",     emit: n_calls
 
     script:
     """
@@ -260,7 +273,7 @@ process MCMC_CALIBRATION_RWMCMC {
     echo "Model server is running on port \${MODEL_PORT}"
 
     python ${script}  --config _params.yml --data ${data} --port \${MODEL_PORT}
-
+    cp $um_highway/model_info/n_calls.txt n_calls.txt 2>/dev/null || echo 0 > n_calls.txt
     touch $um_highway/uq_info/DONE # signal to stop the model server
     """
 }
@@ -284,6 +297,7 @@ process MCMC_CALIBRATION_DYNESTY {
     path "corner_plot.png", emit: mcmc_corner_plot
     path "trace.npy",       emit: mcmc_trace
     path "mcmc_idata.nc",   emit: mcmc_idata
+    path "n_calls.txt",     emit: n_calls
 
     script:
     """
@@ -299,7 +313,7 @@ process MCMC_CALIBRATION_DYNESTY {
     echo "Model server is running on port \${MODEL_PORT}"
 
     python ${script}  --config _params.yml --data ${data} --port \${MODEL_PORT}
-
+    cp $um_highway/model_info/n_calls.txt n_calls.txt 2>/dev/null || echo 0 > n_calls.txt
     touch $um_highway/uq_info/DONE # signal to stop the model server
     """
 }
@@ -321,6 +335,7 @@ process MCMC_CALIBRATION_EMCEE {
     path "corner_plot.png", emit: mcmc_corner_plot
     path "trace.npy",       emit: mcmc_trace
     path "mcmc_idata.nc",   emit: mcmc_idata
+    path "n_calls.txt",     emit: n_calls
 
     script:
     """
@@ -336,7 +351,7 @@ process MCMC_CALIBRATION_EMCEE {
     echo "Model server is running on port \${MODEL_PORT}"
 
     python ${script}  --config _params.yml --data ${data} --port \${MODEL_PORT}
-
+    cp $um_highway/model_info/n_calls.txt n_calls.txt 2>/dev/null || echo 0 > n_calls.txt
     touch $um_highway/uq_info/DONE # signal to stop the model server
     """
 }
@@ -358,6 +373,7 @@ process MCMC_CALIBRATION_PYMC_SLICE {
     path "corner_plot.png", emit: mcmc_corner_plot
     path "trace.npy",       emit: mcmc_trace
     path "mcmc_idata.nc",   emit: mcmc_idata
+    path "n_calls.txt",     emit: n_calls
 
     script:
     """
@@ -373,7 +389,7 @@ process MCMC_CALIBRATION_PYMC_SLICE {
     echo "Model server is running on port \${MODEL_PORT}"
 
     python ${script}  --config _params.yml --data ${data} --port \${MODEL_PORT}
-
+    cp $um_highway/model_info/n_calls.txt n_calls.txt 2>/dev/null || echo 0 > n_calls.txt
     touch $um_highway/uq_info/DONE # signal to stop the model server
     """
 }
@@ -397,6 +413,7 @@ process MCMC_CALIBRATION_PYMC_SMC {
     path "corner_plot.png", emit: mcmc_corner_plot
     path "trace.npy",       emit: mcmc_trace
     path "mcmc_idata.nc",   emit: mcmc_idata
+    path "n_calls.txt",     emit: n_calls
 
     script:
     """
@@ -412,7 +429,7 @@ process MCMC_CALIBRATION_PYMC_SMC {
     echo "Model server is running on port \${MODEL_PORT}"
 
     python ${script}  --config _params.yml --data ${data} --port \${MODEL_PORT}
-
+    cp $um_highway/model_info/n_calls.txt n_calls.txt 2>/dev/null || echo 0 > n_calls.txt
     touch $um_highway/uq_info/DONE # signal to stop the model server
     """
 }
@@ -426,6 +443,10 @@ process RUN_DIAGNOSTICS {
     input:
     path script
     path mcmc_idata
+    path mcmc_output
+    path n_calls
+    val sampler_name
+    val nburn
     val outdir
 
     output:
@@ -434,7 +455,7 @@ process RUN_DIAGNOSTICS {
     script:
     """
     #!/bin/bash
-    python3 ${script} --idata-path ${mcmc_idata} --output-dir "${outdir}"
+    python3 ${script} --idata-path ${mcmc_idata} --npz-path ${mcmc_output} --ncalls-path ${n_calls} --sampler "${sampler_name}" --nburn "${nburn}" --output-dir "${outdir}"
     """
 }
 
@@ -448,6 +469,7 @@ process BUNDLE_OUTPUTS {
     path mcmc_corner_plot
     path mcmc_trace
     path mcmc_idata
+    path mcmc_ncalls
     path mcmc_diagnostics
 
     output:
@@ -465,6 +487,7 @@ process BUNDLE_OUTPUTS {
     cp ${mcmc_corner_plot} "${bundle_name}/"
     cp ${mcmc_trace} "${bundle_name}/"
     cp ${mcmc_idata} "${bundle_name}/"
+    cp ${mcmc_ncalls} "${bundle_name}/"
     cp -r ${mcmc_diagnostics} "${bundle_name}/"
 
     mkdir -p "${output_base_dir}"

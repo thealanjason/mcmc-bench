@@ -6,6 +6,7 @@ References
 - dynesty source:
     https://github.com/joshspeagle/dynesty
 """
+import time
 import argparse
 import yaml
 import numpy as np
@@ -17,8 +18,7 @@ import corner
 import arviz as az
 
 import dynesty
-from dynesty.utils import resample_equal
-# from dynesty.pool import Pool
+from dynesty.utils import resample_equal, get_neff_from_logwt# from dynesty.pool import Pool
 import multiprocessing as mp
 
 class Prior:
@@ -258,6 +258,8 @@ if __name__ == "__main__":
 
     print(f"Running dynesty: ndim={ndim}, nlive={nlive}, dlogz={dlogz}, nprocs={nprocs}")
 
+    sampling_started_at = time.perf_counter()
+
     results = perform_nested_sampling(
         log_likelihood_eval=log_likelihood.eval,
         prior_transform=prior_transform,
@@ -267,8 +269,10 @@ if __name__ == "__main__":
         nprocs=nprocs,
     )
 
-    print(f"Nested sampling completed. logz = {results.logz[-1]:.3f} +/- {results.logzerr[-1]:.3f}")
+    sampling_time_seconds = time.perf_counter() - sampling_started_at
 
+    print(f"Nested sampling completed. logz = {results.logz[-1]:.3f} +/- {results.logzerr[-1]:.3f}")
+    print(f"Sampling runtime: {sampling_time_seconds:.3f} s")
 
     ndim = len(prior.all_parameters)
 
@@ -277,11 +281,22 @@ if __name__ == "__main__":
     weights /= weights.sum()    # just to be safe...
     trace = resample_equal(samples, weights)            # (n_equal, ndim), we are just mimicking MCMC output, so we can use the same plotting functions (as if in the rwmh the more weighted samples are more likely to be drawn, we can resample them to get an unweighted trace)
 
+    kish_ess = get_neff_from_logwt(results.logwt)
+    print(f"Kish ESS = {kish_ess:.1f} from {len(weights)} nested points " f"({100 * kish_ess / len(weights):.1f}% of stored samples)")
+
     # 1. mcmc_output.npz
     samples_3d = trace.reshape(1, -1, ndim)             # mimic (nchains=1, nsteps, ndim), for reporting. 
     lnprob = np.zeros((1, trace.shape[0]))
-    np.savez("mcmc_output.npz", trace=trace, samples=samples_3d, lnprob=lnprob,
-             logz=results.logz[-1], logzerr=results.logzerr[-1])    #  logz is the log evidence, logzerr is the uncertainty in the log evidence (error in the log of the evidence)
+    np.savez(
+        "mcmc_output.npz",
+        trace=trace,
+        samples=samples_3d,
+        lnprob=lnprob,
+        logz=results.logz[-1],
+        logzerr=results.logzerr[-1],
+        sampling_time_seconds=sampling_time_seconds,
+        kish_ess=kish_ess,
+    )
     print("Results saved to mcmc_output.npz")
 
     # 2. corner_plot.png

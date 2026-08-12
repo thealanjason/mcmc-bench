@@ -4,6 +4,7 @@ channels:
 dependencies:
   - python=3.12
   - pyyaml
+  - matplotlib-base<3.11
   - numpy
   - scipy
   - pandas
@@ -15,4 +16,4 @@ dependencies:
   - pip
   - pip:
     - umbridge
-    - git+https://github.com/korkmazgoz-caglar/random-walk-mcmc.git@main
+    - git+https://github.com/korkmazgoz-caglar/random-walk-mcmc.git@v0.1.1

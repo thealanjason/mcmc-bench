@@ -1,3 +1,4 @@
+import time
 import yaml
 import numpy as np
 import emcee
@@ -252,22 +253,34 @@ if __name__ == "__main__":
 
     # Perform MCMC Calibration
     sampler_params = config["calibration"]["sampler_params"]
-    trace, sampler, lnprob, samples = perform_mcmc(prior, log_posterior.eval,
-                nwalkers=sampler_params["emcee"]["nwalkers"],
-                nburn=config["calibration"]["nburn"],
-                nsteps=config["calibration"]["nsteps"],
-                n_workers=sampler_params["emcee"].get("n_workers", 1),
-                pool_type=sampler_params["emcee"].get("pool_type", "serial"))
 
+    sampling_started_at = time.perf_counter()
 
+    trace, sampler, lnprob, samples = perform_mcmc(
+        prior,
+        log_posterior.eval,
+        nwalkers=sampler_params["emcee"]["nwalkers"],
+        nburn=config["calibration"]["nburn"],
+        nsteps=config["calibration"]["nsteps"],
+        n_workers=sampler_params["emcee"].get("n_workers", 1),
+        pool_type=sampler_params["emcee"].get("pool_type", "serial"),
+    )
+
+    sampling_time_seconds = time.perf_counter() - sampling_started_at
 
     print(f"MCMC completed. Trace shape: {trace.shape}")
+    print(f"Sampling runtime: {sampling_time_seconds:.3f} s")
 
     # Save results
     data_basename, ext = os.path.splitext(args.data)
-    np.savez(f"mcmc_output.npz", 
-                trace=trace, samples=samples, lnprob=lnprob)
-    print(f"Results saved to mcmc_output.npz")
+    np.savez(
+        "mcmc_output.npz",
+        trace=trace,
+        samples=samples,
+        lnprob=lnprob,
+        sampling_time_seconds=sampling_time_seconds,
+    )
+    print("Results saved to mcmc_output.npz")
 
     corner_plot = corner.corner(trace, labels=prior.all_parameters, show_titles=True)
     corner_plot.savefig(f"corner_plot")
