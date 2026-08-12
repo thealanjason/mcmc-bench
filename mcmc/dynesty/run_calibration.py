@@ -301,8 +301,6 @@ if __name__ == "__main__":
 
     # 2. corner_plot.png
     corner_plot = corner.corner(trace, labels=prior.all_parameters, show_titles=True)
-    # keep = weights > weights.max() * 1e-4
-    # corner_plot = corner.corner(samples[keep], weights=weights[keep], labels=prior.all_parameters, show_titles=True)
     corner_plot.savefig("corner_plot.png")
     print("Corner plot saved to corner_plot.png")
 
