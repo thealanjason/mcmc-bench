@@ -4,7 +4,7 @@
 #
 # Usage:
 #   cd ~/mcmc-bench
-#   export NXF_VER=25.04.6        # pin the Nextflow version (see below)
+#   export NXF_VER=25.10.4        # pin the Nextflow version (see below)
 #   chmod +x run_all_samplers.sh  # only needed once
 #   ./run_all_samplers.sh
 #
