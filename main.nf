@@ -123,7 +123,6 @@ workflow bpc_massflowIA {
         mcmc_ncalls = MCMC_CALIBRATION_EMCEE.out.n_calls
     }
 
-    // These are hard-coded to emcee, I should modify. Done!
     RUN_DIAGNOSTICS(
         file("$moduleDir/diagnostics/run_diagnostics.py"),
         mcmc_idata,
@@ -134,7 +133,6 @@ workflow bpc_massflowIA {
         "diagnostics"
     )
 
-    // Hard-coded to emcee, I should modify again. Done! (MCMC_CALIBRATION_EMCEE.out.mcmc_output -> mcmc_output, etc.)
     BUNDLE_OUTPUTS(
         "$moduleDir/outputs",
         bundle_name,
@@ -240,8 +238,6 @@ process SERVE_MODEL {
     """
 }
 
-// Delta starts here:
-
 process MCMC_CALIBRATION_RWMCMC {
     conda "$moduleDir/mcmc/rwmcmc/environment.yml"
     cache 'lenient'
@@ -278,10 +274,6 @@ process MCMC_CALIBRATION_RWMCMC {
     """
 }
 
-
-// Delta ends here.
-
-// Delta "dynesty" starts here:
 process MCMC_CALIBRATION_DYNESTY {
     conda "$moduleDir/mcmc/dynesty/environment.yml"
     cache 'lenient'
@@ -317,8 +309,6 @@ process MCMC_CALIBRATION_DYNESTY {
     touch $um_highway/uq_info/DONE # signal to stop the model server
     """
 }
-
-// Delta "dynesty" ends here.
 
 process MCMC_CALIBRATION_EMCEE {
     conda "$moduleDir/mcmc/emcee/environment.yml"
@@ -356,8 +346,6 @@ process MCMC_CALIBRATION_EMCEE {
     """
 }
 
-// PYMC_SLICE starts here
-
 process MCMC_CALIBRATION_PYMC_SLICE {
     conda "$moduleDir/mcmc/pymc_slice/environment.yml"
     cache 'lenient'
@@ -394,10 +382,6 @@ process MCMC_CALIBRATION_PYMC_SLICE {
     """
 }
 
-// PYMC_SLICE ends here
-
-// PYMC_smc starts here
-
 process MCMC_CALIBRATION_PYMC_SMC {
     conda "$moduleDir/mcmc/pymc_smc/environment.yml"
     cache 'lenient'
@@ -433,8 +417,6 @@ process MCMC_CALIBRATION_PYMC_SMC {
     touch $um_highway/uq_info/DONE # signal to stop the model server
     """
 }
-
-// PYMC_smc ends here
 
 
 process RUN_DIAGNOSTICS {

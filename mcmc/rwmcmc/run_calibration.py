@@ -3,12 +3,8 @@ import yaml
 import numpy as np
 import pandas as pd
 from scipy.stats import uniform, norm, truncnorm
-# from concurrent.futures import ThreadPoolExecutor
-# from multiprocessing import Pool
-# import contextlib
 import umbridge
 import argparse
-# import os
 import corner
 import arviz as az
 from rwmcmc.samplers import random_walk_metropolis_hastings
@@ -156,21 +152,6 @@ class LogPosterior:
         return log_prior + self.log_likelihood.eval(parameters)
 
 
-""" 
-def initialize_walkers(nwalkers: int, prior: Prior) -> np.ndarray:
-    nparameters = len(prior.distributions)
-    initial_positions = np.zeros((nwalkers, nparameters))
-
-    for i in range(nparameters):
-        initial_positions[:, i] = prior.distributions[i].rvs(size=nwalkers)
-
-    return initial_positions
-
-POOL_TYPES = ("serial", "thread", "process")
- """
-
-# Here I renamed the walkers function with chains.
-
 def initialize_chains(nchains: int, prior: Prior) -> np.ndarray:
     nparameters = len(prior.distributions)
     initial_positions = np.zeros((nchains, nparameters))
@@ -180,46 +161,8 @@ def initialize_chains(nchains: int, prior: Prior) -> np.ndarray:
 
     return initial_positions
 
-""" 
-@contextlib.contextmanager
-def _build_pool(pool_type: str, n_workers: int):
-    if pool_type == "thread":
-        with ThreadPoolExecutor(max_workers=n_workers) as pool:
-            yield pool
-    elif pool_type == "process":
-        with Pool(processes=n_workers) as pool:
-            yield pool
-    else:
-        yield None
- """
-
-""" def perform_mcmc(prior, log_posterior, nchains=50, nburn=2500, nsteps=5000, n_workers=1, pool_type="serial"):
-    if pool_type not in POOL_TYPES:
-        print(f"pool_type '{pool_type}' not supported. Choose from: {POOL_TYPES}")
-        exit(1)
-
-    # Initialize Chains
-    initial_positions = initialize_chains(nchains, prior)
-
-    # Setup Sampler
-    ndim = len(prior.distributions)
-    with _build_pool(pool_type, n_workers) as pool:
-        sampler = emcee.EnsembleSampler(nchains, ndim, log_posterior, pool=pool)
-
-        # Run Calibration
-        sampler.run_mcmc(initial_positions, nsteps, progress=True)
-
-    # Extract Results (post burn-in)
-    trace = sampler.chain[:, nburn:, :].reshape(-1, ndim)
-    lnprob = sampler.lnprobability[:, nburn:]
-    samples = sampler.chain[:, nburn:, :]
-
-    return trace, sampler, lnprob, samples """
-
 def perform_mcmc(prior, log_posterior_eval, nchains=100, nsteps=2000, step_size=0.1, rng=None)-> tuple:
-    """
-    Here, we want to mimic the emcee with number of chains. For each chain, we run the random walk metropolis hastings sampler independently inside a for loop. No parallelization, so it might be slower than the classic rwmh.
-    """
+    """Run independent random-walk Metropolis-Hastings chains serially."""
     
     if rng is None: rng = np.random.default_rng()
     step_size = np.asarray(step_size)
@@ -227,14 +170,13 @@ def perform_mcmc(prior, log_posterior_eval, nchains=100, nsteps=2000, step_size=
     initial_positions = initialize_chains(nchains, prior)
     ndim = len(prior.distributions)
 
-    # We will run a loop so we need to pre-allocate the samples_all, accepted_all.
-
+    # Pre-allocate samples and acceptance indicators.
     samples_all = np.zeros((nchains, nsteps, ndim))
     accepted_all = np.zeros((nchains, nsteps), dtype=bool)
 
     # Run MCMC for each chain
     for chain_i in range(nchains):
-        chain_rng = np.random.default_rng(rng.integers(0, 1e9))  # Create a separate RNG for each chain to make them statistically independent (we're just reducing the risks of correlations between chains, not guaranteeing it)
+        chain_rng = np.random.default_rng(rng.integers(0, 1e9))
 
         samples, accepted = random_walk_metropolis_hastings(
             target_log_pdf=log_posterior_eval,
@@ -300,16 +242,6 @@ if __name__ == "__main__":
                                     noise_sigma=config["calibration"].get("noise_sigma", None))
     log_posterior = LogPosterior(log_prior, log_likelihood)
 
-    """     
-        # Perform MCMC Calibration
-        trace, sampler, lnprob, samples = perform_mcmc(prior, log_posterior.eval,
-                    nwalkers=config["calibration"]["nwalkers"],
-                    nburn=config["calibration"]["nburn"],
-                    nsteps=config["calibration"]["nsteps"],
-                    n_workers=config["calibration"].get("n_workers", 1),
-                    pool_type=config["calibration"].get("pool_type", "serial"))
-    """
-
     # Perform MCMC Calibration
     sampler_params = config["calibration"]["sampler_params"]["rwmcmc"]
     nchains = sampler_params["nwalkers"]
@@ -338,15 +270,14 @@ if __name__ == "__main__":
     
     
     # SAVE RESULTS
-    # data_basename, ext = os.path.splitext(args.data) # I deleted the .os import, I do not think that I will need that.
     ndim = len(prior.all_parameters)
 
-    # Here, we need to represent our samples in the same format as emcee, nchains*nsteps, ndim.
+    # Flatten retained chains to the common trace format.
     trace = samples_all[:, nburn:, :].reshape(-1, ndim)
 
     samples_post_burn = samples_all[:, nburn:, :]
 
-    # Just a placeholder, otherwise we will get an error.
+    # Placeholder required by the common output schema.
     lnprob = np.zeros((nchains, nsteps-nburn))
 
     np.savez(
@@ -365,14 +296,8 @@ if __name__ == "__main__":
     # Save samples as .npy file
     np.save(f"trace.npy", trace)
     print(f"Samples saved to trace.npy")
-    """ 
-        # Idata for Diagnostics with Arviz
-        idata = az.from_emcee(sampler, var_names = prior.all_parameters)
-        idata.to_netcdf(f"mcmc_idata.nc")
-        print(f"Calibration inference data saved to mcmc_idata.nc")
-    """
 
-    # Idata for Diagnostics with Arviz - for rwmcmc we do not have the same sampler, we need to create a custom InferenceData object
+    # Create custom InferenceData for RWMH diagnostics.
     posterior = dict()
     for i, name in enumerate(prior.all_parameters):
         posterior[name] = samples_all[:, :, i]

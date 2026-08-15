@@ -76,7 +76,7 @@ def run_quantitative_diagnostics(idata, param_labels, sampler_name, output_dir=N
         display["ess_per_second"] = np.nan
         
     n_chains = idata.posterior.sizes.get("chain", 1)
-    if sampler_name in {"emcee", "dynesty"} or n_chains < 2:
+    if sampler_name in {"emcee", "dynesty", "pymc_smc"} or n_chains < 2:
         display["converged"] = "N/A"
     else:
         convergence_mask = (

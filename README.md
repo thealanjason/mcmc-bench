@@ -1,13 +1,13 @@
-# Benchmarking MCMC Sampling Methods for Bayesian Parameter Calibration of Mass Flow Simulators
+# Benchmarking Sampling Methods for Probabilistic Calibration in Gravity-Driven Mass Flow Modeling
 
 ## Motivation 
-Bayesian parameter calibration of computational models can be performed using a variety of MCMC sampling methods. Each method differs in algorithm design, implementation details, accuracy, speed, and resource consumption. Some implementations are domain-specific, leverage modern hardware such as GPUs, or are tied to a particular programming language. These differences make it difficult to systematically compare methods and select the most suitable one for a given application.
+Bayesian parameter calibration of computational models can be performed using a variety of sampling methods. Each method differs in algorithm design, implementation details, accuracy, speed, and resource consumption. Some implementations are domain-specific, leverage modern hardware such as GPUs, or are tied to a particular programming language. These differences make it difficult to systematically compare methods and select the most suitable one for a given application.
 
 ## Goal
-The goal of this project is to compare and gain insights into the behavior of different MCMC sampling methods in the context of Bayesian parameter calibration of mass flow simulators.
+The goal of this project is to compare and gain insights into the behavior of different sampling methods in the context of Bayesian parameter calibration of mass flow simulators.
 
 ## Tasks
-- \>\> Implement a selection of MCMC sampling methods and apply them to a representative mass flow simulation model.
+- \>\> Implement a selection of sampling methods and apply them to a representative mass flow simulation model.
 
 - \>\> Compare the methods across key criteria such as accuracy, convergence, speed, and resource consumption.
 
@@ -29,17 +29,35 @@ conda activate mcmc-bench
 nextflow run main.nf -params-file params.yml --config_file params.yml
 ```
 
-### Selecting a sampler
+### Selecting a sampling method
 
-The MCMC sampler is chosen via the `calibration.sampler` field in
-`params.yml`. Two samplers are currently available:
+The sampling method is chosen via the `calibration.sampler` field in
+`params.yml`. Five methods are currently available:
 ```yaml
 calibration:
-  sampler: rwmcmc   # options: emcee | rwmcmc | dynesty
+  sampler: rwmcmc   # options: rwmcmc | emcee | pymc_slice | pymc_smc | dynesty
 ```
-Each sampler reads its own parameters from `calibration.sampler_params`,
+Each sampler implementation reads its own parameters from `calibration.sampler_params`,
 so you can configure them independently (e.g. `nwalkers` for emcee,
 `step_size` for rwmcmc).
+
+### Running all sampling methods
+
+The five sampler implementations can be executed sequentially with:
+
+```bash
+NXF_VER=25.10.4 ./run_all_samplers.sh
+```
+
+The script restores `params.yml` after execution and writes the individual
+sampler logs to `benchmark_logs/`.
+
+### Outputs
+
+Each workflow execution creates a session-specific output bundle under
+`outputs/`. The bundle contains the run configuration, posterior samples,
+diagnostic results, plots, model-call count, and an automatically generated
+PDF report.
 
 ### Parallelization (dynesty)
 
@@ -47,6 +65,10 @@ dynesty supports parallel likelihood evaluations via the
 `sampler_params.dynesty.nprocs` field in `params.yml`. Setting
 `nprocs > 1` distributes likelihood calls across worker processes
 using Python's `multiprocessing` pool; `nprocs = 1` runs serially (default).
+
+## Report
+
+The evaluation report and preserved benchmark results are available in the [mcmc-bench-report repository](https://github.com/korkmazgoz-caglar/mcmc-bench-report).
 
 ## References
 [1] Chi-Feng, H.: MCMC Playground – Interactive Visualization of Markov Chain Monte Carlo Algorithms, https://chi-feng.github.io/mcmc-demo/app.html?algorithm=HamiltonianMC&target=banana (last access: 23 April 2026).

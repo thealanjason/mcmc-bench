@@ -165,7 +165,6 @@ def perform_nested_sampling(log_likelihood_eval, prior_transform, ndim, nlive, d
     dlogz : float
         Stopping criterion: stop when the estimated remaining evidence
         contribution to ln(Z) drops below this threshold.
-        We do not have this in emcee or rwmcmc, good thing to have.
 
     Returns
     -------
@@ -277,15 +276,16 @@ if __name__ == "__main__":
     ndim = len(prior.all_parameters)
 
     samples = results.samples
-    weights = np.exp(results.logwt - results.logz[-1])  # each point has a weight, here we normalize them to sum to 1
-    weights /= weights.sum()    # just to be safe...
-    trace = resample_equal(samples, weights)            # (n_equal, ndim), we are just mimicking MCMC output, so we can use the same plotting functions (as if in the rwmh the more weighted samples are more likely to be drawn, we can resample them to get an unweighted trace)
+    weights = np.exp(results.logwt - results.logz[-1])
+    weights /= weights.sum()
+    # Convert weighted samples to an equal-weight trace for common output compatibility.
+    trace = resample_equal(samples, weights)
 
     kish_ess = get_neff_from_logwt(results.logwt)
     print(f"Kish ESS = {kish_ess:.1f} from {len(weights)} nested points " f"({100 * kish_ess / len(weights):.1f}% of stored samples)")
 
     # 1. mcmc_output.npz
-    samples_3d = trace.reshape(1, -1, ndim)             # mimic (nchains=1, nsteps, ndim), for reporting. 
+    samples_3d = trace.reshape(1, -1, ndim)
     lnprob = np.zeros((1, trace.shape[0]))
     np.savez(
         "mcmc_output.npz",

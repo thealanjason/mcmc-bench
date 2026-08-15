@@ -170,7 +170,6 @@ def add_general_section(pdf: MCMCReport, cfg: dict, sampling_time_seconds: float
     sampler_name = cal["sampler"]
     sampler_cfg  = cal["sampler_params"][sampler_name]
 
-    # Sampler-specific headline parameter / I modified this part to handle the dynesty sampler, CHECKPOINT.
     if sampler_name == "dynesty":
         sampler_line = ("Live points (nlive)", str(sampler_cfg.get("nlive", "")))
     elif sampler_name == "pymc_slice":
@@ -275,7 +274,7 @@ def add_diagnostics_section(pdf: MCMCReport, bundle_dir: Path):
     diag_dir = bundle_dir / "diagnostics"
 
     pdf.add_page()
-    pdf.section_title("2. MCMC Diagnostics")
+    pdf.section_title("2. Sampling Diagnostics")
     pdf.embed_image(img_path = diag_dir / "trace.png", caption="Figure 2 - Trace plots. Left: marginal posteriors; right: sample traces per walker.", w_mm=160)
     add_diagnostics_table(pdf, diag_dir / "convergence_diagnostics.csv")
     pdf.body_text(

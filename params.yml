@@ -13,7 +13,7 @@ calibration:
   sampler: dynesty # emcee, dynesty, rwmcmc, pymc_slice, pymc_smc
   sampler_params:
     rwmcmc:
-        step_size: [0.15, 1200] # step size for each parameter, mu and xi, respectively. I took 10% of the range. This should be modified/tuned according to the acceptance ratio from the real test. Okay so I tested it, this gives the best results for efficiency and acceptance ratio. I will keep it for now.
+        step_size: [0.15, 1200]
         nwalkers:     4
 
     emcee:
